@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gabia Serverless Platform</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="logo">
+                <span class="logo-icon">☁️</span>
+                <h1>MyPlatform</h1>
+            </div>
+            <div class="topbar-actions">
+                <button class="icon-btn" title="환경설정">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+                <button class="btn btn-primary" id="loginBtn">로그인</button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-content">
+            <!-- Sidebar (App List) -->
+            <aside class="sidebar">
+                <h2 class="sidebar-title">Applications</h2>
+                <ul class="app-list" id="appList">
+                    <!-- Apps will be injected by JavaScript -->
+                </ul>
+            </aside>
+
+            <!-- Content Area (App View) -->
+            <main class="content-area">
+                <div class="content-wrapper" id="appContent">
+                    <div class="empty-state">
+                        <div class="empty-icon">👈</div>
+                        <h3>앱을 선택해주세요</h3>
+                        <p>왼쪽 메뉴에서 앱을 선택하면 이곳에 화면이 나타납니다.</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal for l2.list Editor -->
+    <div class="modal-overlay" id="l2ListModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>l2.list 설정 관리</h3>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <div id="l2ListSaveStatus" style="color: #10b981; font-size: 0.875rem;"></div>
+                    <button class="btn btn-primary" id="saveL2ListBtn">저장하기</button>
+                    <button class="icon-btn" id="closeL2ListModal" style="margin-left: 8px; font-size: 1.2rem;">✕</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <textarea id="l2ListEditor" spellcheck="false" style="width: 100%; height: 400px; background: #000; color: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 0.9rem; resize: vertical; outline: none;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

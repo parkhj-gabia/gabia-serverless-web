@@ -1,0 +1,157 @@
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
+const admin = require('firebase-admin');
+
+const app = express();
+app.use(express.json());
+
+// Firebase Admin 초기화 (Firestore 연동)
+let useFirestore = false;
+let db = null;
+try {
+    // 환경변수에 구글 크레덴셜이 있거나 로컬 ADC(Application Default Credentials)가 잡히면 동작합니다.
+    // 구글 클라우드 환경(Cloud Functions)에서는 기본적으로 인증이 자동으로 됩니다.
+    admin.initializeApp();
+    db = admin.firestore();
+    useFirestore = true;
+    console.log("Firestore initialized successfully.");
+} catch (e) {
+    console.log("Firestore initialization failed. Falling back to local file system for l2.list.");
+}
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+// L2.list 파싱 유틸리티 함수
+function parseL2List(content, targetIp) {
+    const lines = content.split('\n');
+    let isFound = false;
+    let l2Comment = '';
+    let serverIps = [];
+
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        
+        let cleanLine = line.split('#')[0].trim();
+        let comment = line.includes('#') ? line.split('#')[1].trim() : '';
+
+        if (!isFound) {
+            if (cleanLine === targetIp) {
+                isFound = true;
+                l2Comment = comment;
+            }
+        } else {
+            if (cleanLine.startsWith('-')) {
+                let ip = cleanLine.substring(1).trim();
+                serverIps.push(ip);
+            } else {
+                break;
+            }
+        }
+    }
+    return { isFound, l2Comment, serverIps };
+}
+
+// API Endpoint for App.L2 ping check
+app.post('/api/run-l2', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) {
+        return res.status(400).json({ error: 'IP address is required' });
+    }
+
+    try {
+        let content = '';
+        if (useFirestore) {
+            const doc = await db.collection('config').doc('l2list').get();
+            if (doc.exists) {
+                content = doc.data().content || '';
+            }
+        } else {
+            const listFilePath = path.join(__dirname, 'App.L2', 'l2.list');
+            if (fs.existsSync(listFilePath)) {
+                content = fs.readFileSync(listFilePath, 'utf-8');
+            }
+        }
+
+        const { isFound, l2Comment, serverIps } = parseL2List(content, ip);
+        
+        if (!isFound) {
+            return res.json({ output: `[Error] Cannot find IP ${ip} in the list.` });
+        }
+
+        // Ping Worker VM API 호출 (실제 배포 시 환경변수로 VM IP를 지정합니다)
+        const workerUrl = process.env.WORKER_API_URL || 'http://127.0.0.1:5000/ping';
+        
+        try {
+            const response = await axios.post(workerUrl, { server_ips: serverIps });
+            const results = response.data.results || [];
+            
+            let headerText = `L2 IP [${ip}]`;
+            if (l2Comment) headerText += ` (# ${l2Comment})`;
+            headerText += " Sub-server Ping Test Results";
+
+            let outputText = headerText + '\n';
+            outputText += '-'.repeat(50) + '\n';
+            
+            for (let r of results) {
+                if (r.alive) {
+                    outputText += ` [OK] Alive : ${r.ip}\n`;
+                } else {
+                    outputText += ` [XX] Dead  : ${r.ip}\n`;
+                }
+            }
+            outputText += '-'.repeat(50) + '\n';
+
+            res.json({ output: outputText });
+        } catch (workerErr) {
+            res.json({ output: `[Error] Ping Worker VM API Failed.\nURL: ${workerUrl}\nMessage: ${workerErr.message}\nMake sure the worker.py is running.` });
+        }
+    } catch (err) {
+        res.json({ output: `[System Error] ${err.message}` });
+    }
+});
+
+// l2.list 내용 조회 API
+app.get('/api/l2-list', async (req, res) => {
+    try {
+        if (useFirestore) {
+            const doc = await db.collection('config').doc('l2list').get();
+            const content = doc.exists ? (doc.data().content || '') : '';
+            return res.json({ content });
+        } else {
+            const listFilePath = path.join(__dirname, 'App.L2', 'l2.list');
+            if (!fs.existsSync(listFilePath)) return res.json({ content: '' });
+            const content = fs.readFileSync(listFilePath, 'utf-8');
+            return res.json({ content });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// l2.list 내용 저장 API
+app.post('/api/l2-list', async (req, res) => {
+    const { content } = req.body;
+    if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
+
+    try {
+        if (useFirestore) {
+            await db.collection('config').doc('l2list').set({ content });
+            return res.json({ success: true });
+        } else {
+            const listFilePath = path.join(__dirname, 'App.L2', 'l2.list');
+            fs.writeFileSync(listFilePath, content, 'utf-8');
+            return res.json({ success: true });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+exports.app = app;
