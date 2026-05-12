@@ -2,7 +2,7 @@
 const apps = [
     {
         id: 'app1',
-        title: 'App.L2 점검',
+        title: 'L2 핑 점검',
         icon: '🖧',
         description: 'L2 스위치 및 하위 서버 상태 점검',
         content: `
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     outputBlock.innerText = "서버 상태 확인 중...";
 
                     try {
-                        const response = await fetch('/api/run-l2', {
+                        const response = await fetch('api/run-l2', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ ip })
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveL2Status.style.color = 'var(--text-secondary)';
 
             try {
-                const response = await fetch('/api/l2-list', {
+                const response = await fetch('api/l2-list', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content })
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveL2Status.innerText = "";
         l2Modal.classList.add('active');
 
-        fetch('/api/l2-list')
+        fetch('api/l2-list')
             .then(res => res.json())
             .then(data => {
                 if (data.content !== undefined) {

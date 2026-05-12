@@ -21,6 +21,14 @@ try {
     console.log("Firestore initialization failed. Falling back to local file system for l2.list.");
 }
 
+// Cloud Functions 등에서 서브경로로 접속 시 슬래시(/) 누락으로 인한 CSS 경로 깨짐 방지
+app.use((req, res, next) => {
+    if (req.path === '/' && req.originalUrl && !req.originalUrl.endsWith('/')) {
+        return res.redirect(301, req.originalUrl + '/');
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // L2.list 파싱 유틸리티 함수
