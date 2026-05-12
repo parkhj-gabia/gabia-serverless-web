@@ -187,7 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const response = await fetch('api/run-l2', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${window.authToken}`
+                            },
                             body: JSON.stringify({ ip })
                         });
                         
@@ -213,18 +216,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Dummy Login Action
-    loginBtn.addEventListener('click', () => {
-        if(loginBtn.innerText === '로그인') {
-            loginBtn.innerText = '로그아웃';
-            loginBtn.style.backgroundColor = 'var(--surface-hover)';
-            loginBtn.style.color = 'var(--text-primary)';
-        } else {
-            loginBtn.innerText = '로그인';
-            loginBtn.style.backgroundColor = 'var(--accent-color)';
-            loginBtn.style.color = 'white';
+    // Firebase Auth State Listener
+    const loginOverlay = document.getElementById('loginOverlay');
+    const mainAppContainer = document.getElementById('mainAppContainer');
+    const googleLoginBtn = document.getElementById('googleLoginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    if (window.onAuthStateChanged && window.firebaseAuth) {
+        window.onAuthStateChanged(window.firebaseAuth, async (user) => {
+            if (user) {
+                // User is logged in
+                window.authToken = await user.getIdToken();
+                loginOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    loginOverlay.style.display = 'none';
+                    mainAppContainer.style.display = 'flex';
+                }, 300);
+            } else {
+                // User is logged out
+                window.authToken = null;
+                mainAppContainer.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+                loginOverlay.style.opacity = '1';
+            }
+        });
+
+        // Login Action
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', async () => {
+                const provider = new window.GoogleAuthProvider();
+                try {
+                    loginErrorMsg.style.display = 'none';
+                    await window.signInWithPopup(window.firebaseAuth, provider);
+                } catch (error) {
+                    console.error(error);
+                    loginErrorMsg.innerText = "로그인 에러: " + error.message;
+                    loginErrorMsg.style.display = 'block';
+                }
+            });
         }
-    });
+
+        // Logout Action
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                await window.signOut(window.firebaseAuth);
+            });
+        }
+    } else {
+        // Fallback if Firebase fails to load
+        console.warn("Firebase Auth not loaded.");
+        if (loginOverlay) loginOverlay.style.display = 'none';
+        if (mainAppContainer) mainAppContainer.style.display = 'flex';
+    }
 
     // Modal Logic
     const l2Modal = document.getElementById('l2ListModal');
@@ -249,7 +293,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch('api/l2-list', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${window.authToken}`
+                    },
                     body: JSON.stringify({ content })
                 });
                 const result = await response.json();
@@ -280,7 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
         saveL2Status.innerText = "";
         l2Modal.classList.add('active');
 
-        fetch('api/l2-list')
+        fetch('api/l2-list', {
+            headers: { 'Authorization': `Bearer ${window.authToken}` }
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.content !== undefined) {

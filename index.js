@@ -63,8 +63,37 @@ function parseL2List(content, targetIp) {
     return { isFound, l2Comment, serverIps };
 }
 
+// 인증 미들웨어
+const authenticateUser = async (req, res, next) => {
+    // 로컬 테스트나 Firebase Admin 초기화 실패 시 임시 통과 허용 (선택 사항이나, 클라우드에서는 강제)
+    if (!useFirestore) {
+        // return next(); // 주석 해제 시 로컬 개발 중에는 인증을 무시합니다.
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: '인증 토큰이 없습니다.' });
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        req.user = decodedToken;
+        
+        // 여기에 특정 이메일만 허용하는 로직을 추가할 수 있습니다.
+        // const allowedEmails = ['parkhj@gabia.com'];
+        // if (!allowedEmails.includes(req.user.email)) {
+        //     return res.status(403).json({ error: '접근이 허가되지 않은 계정입니다.' });
+        // }
+        
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: '유효하지 않은 인증 토큰입니다.', details: err.message });
+    }
+};
+
 // API Endpoint for App.L2 ping check
-app.post('/api/run-l2', async (req, res) => {
+app.post('/api/run-l2', authenticateUser, async (req, res) => {
     const { ip } = req.body;
     if (!ip) {
         return res.status(400).json({ error: 'IP address is required' });
@@ -125,7 +154,7 @@ app.post('/api/run-l2', async (req, res) => {
 });
 
 // l2.list 내용 조회 API
-app.get('/api/l2-list', async (req, res) => {
+app.get('/api/l2-list', authenticateUser, async (req, res) => {
     try {
         if (useFirestore) {
             const doc = await db.collection('config').doc('l2list').get();
@@ -143,7 +172,7 @@ app.get('/api/l2-list', async (req, res) => {
 });
 
 // l2.list 내용 저장 API
-app.post('/api/l2-list', async (req, res) => {
+app.post('/api/l2-list', authenticateUser, async (req, res) => {
     const { content } = req.body;
     if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
 
