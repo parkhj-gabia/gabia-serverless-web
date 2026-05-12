@@ -35,13 +35,16 @@ def run_ping():
         return jsonify({'error': 'server_ips list is required'}), 400
 
     server_ips = data.get('server_ips', [])
-    ping_param = '-n' if platform.system().lower() == 'windows' else '-c'
     results = []
-
+    
     for ip in server_ips:
-        command = ['ping', ping_param, '1', ip]
+        if platform.system().lower() == 'windows':
+            command = ['ping', '-n', '1', ip]
+        else:
+            command = ['ping', '-c', '1', '-n', '-W', '2', ip]
+            
         try:
-            res = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+            res = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4)
             is_alive = (res.returncode == 0)
         except subprocess.TimeoutExpired:
             is_alive = False
@@ -81,7 +84,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/opt/ping-worker
-Environment="PATH=/opt/ping-worker/venv/bin"
+Environment="PATH=/opt/ping-worker/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/opt/ping-worker/venv/bin/python worker.py
 Restart=always
 

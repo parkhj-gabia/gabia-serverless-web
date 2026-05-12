@@ -30,6 +30,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/App.buildpassword', express.static(path.join(__dirname, 'App.buildpassword')));
 
 // L2.list 파싱 유틸리티 함수
 function parseL2List(content, targetIp) {
@@ -103,16 +104,18 @@ app.post('/api/run-l2', async (req, res) => {
             let outputText = headerText + '\n';
             outputText += '-'.repeat(50) + '\n';
             
+            let allAlive = results.length > 0;
             for (let r of results) {
                 if (r.alive) {
                     outputText += ` [OK] Alive : ${r.ip}\n`;
                 } else {
                     outputText += ` [XX] Dead  : ${r.ip}\n`;
+                    allAlive = false;
                 }
             }
             outputText += '-'.repeat(50) + '\n';
 
-            res.json({ output: outputText });
+            res.json({ output: outputText, allAlive });
         } catch (workerErr) {
             res.json({ output: `[Error] Ping Worker VM API Failed.\nURL: ${workerUrl}\nMessage: ${workerErr.message}\nMake sure the worker.py is running.` });
         }

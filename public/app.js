@@ -15,7 +15,13 @@ const apps = [
                 </div>
             </div>
             <div class="app-card" style="margin-top: 16px; position: relative;">
-                <h3>실행 결과</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>실행 결과</h3>
+                    <div id="l2SuccessBox" style="display: none; align-items: center; gap: 8px;">
+                        <span style="color: var(--success-color); font-weight: bold;">하단 서버 핑 정상</span>
+                        <button id="copyL2SuccessBtn" class="btn" style="padding: 4px 12px; font-size: 0.85rem; background: rgba(255,255,255,0.1); color: var(--text-primary); height: auto; min-width: 80px;">복사 📋</button>
+                    </div>
+                </div>
                 <div id="l2Loading" style="display: none; position: absolute; top: 24px; right: 24px; color: var(--accent-color);">실행 중...</div>
                 <pre id="l2Output" style="margin-top: 16px; background: #000; padding: 16px; border-radius: 8px; color: #a3ffa3; font-family: monospace; font-size: 0.9rem; min-height: 150px; overflow-x: auto; white-space: pre-wrap;">실행 결과가 여기에 표시됩니다.</pre>
             </div>
@@ -32,33 +38,11 @@ const apps = [
     },
     {
         id: 'app2',
-        title: 'App 2',
-        icon: '⚙️',
-        description: '서비스 환경 설정 및 관리 도구',
+        title: '로그인 정보 생성기',
+        icon: '🔐',
+        description: '독립 모듈로 동작하는 패스워드 자동 생성기입니다.',
         content: `
-            <div class="app-card">
-                <h3>서비스 설정</h3>
-                <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
-                        <div>
-                            <strong>자동 스케일링</strong>
-                            <div style="font-size: 12px; color: var(--text-secondary);">트래픽 증가 시 자동으로 리소스 확장</div>
-                        </div>
-                        <div style="width: 40px; height: 20px; background: var(--accent-color); border-radius: 10px; position: relative; cursor: pointer;">
-                            <div style="position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; background: white; border-radius: 50%;"></div>
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
-                        <div>
-                            <strong>디버그 모드</strong>
-                            <div style="font-size: 12px; color: var(--text-secondary);">상세한 로그 기록 활성화</div>
-                        </div>
-                        <div style="width: 40px; height: 20px; background: var(--surface-hover); border-radius: 10px; position: relative; cursor: pointer;">
-                            <div style="position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; background: white; border-radius: 50%;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <iframe src="App.buildpassword/index.html" style="width: 100%; height: 850px; border: none; background: transparent;"></iframe>
         `
     },
     {
@@ -126,33 +110,55 @@ document.addEventListener('DOMContentLoaded', () => {
         renderContent(app);
     }
 
-    // Render app content
     function renderContent(app) {
         // Remove animation to re-trigger it
         appContent.style.animation = 'none';
         appContent.offsetHeight; // trigger reflow
         appContent.style.animation = null;
 
-        appContent.innerHTML = `
-            <div class="app-header">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 2rem;">${app.icon}</span>
-                    <div>
-                        <h2>${app.title}</h2>
-                        <p>${app.description}</p>
+        if (app.id === 'app2') {
+            appContent.innerHTML = `
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+                    ${app.content}
+                </div>
+            `;
+        } else {
+            appContent.innerHTML = `
+                <div class="app-header">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 2rem;">${app.icon}</span>
+                        <div>
+                            <h2>${app.title}</h2>
+                            <p>${app.description}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="app-body">
-                ${app.content}
-            </div>
-        `;
+                <div class="app-body">
+                    ${app.content}
+                </div>
+            `;
+        }
 
         if (app.id === 'app1') {
             const runBtn = document.getElementById('runL2Btn');
             const ipInput = document.getElementById('l2IpInput');
             const outputBlock = document.getElementById('l2Output');
             const loadingIndicator = document.getElementById('l2Loading');
+            const successBox = document.getElementById('l2SuccessBox');
+            const copySuccessBtn = document.getElementById('copyL2SuccessBtn');
+
+            if (copySuccessBtn) {
+                copySuccessBtn.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText('하단 서버 핑 정상');
+                        const originalText = copySuccessBtn.innerText;
+                        copySuccessBtn.innerText = '복사됨 ✅';
+                        setTimeout(() => copySuccessBtn.innerText = originalText, 1500);
+                    } catch (err) {
+                        alert('복사 실패');
+                    }
+                });
+            }
 
             if (runBtn) {
                 runBtn.addEventListener('click', async () => {
@@ -175,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     runBtn.disabled = true;
                     loadingIndicator.style.display = 'block';
+                    if (successBox) successBox.style.display = 'none';
                     outputBlock.innerText = "서버 상태 확인 중...";
 
                     try {
@@ -186,6 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         const result = await response.json();
                         outputBlock.innerText = result.output || result.error || "결과 없음";
+                        
+                        if (result.allAlive && successBox) {
+                            successBox.style.display = 'flex';
+                        }
                     } catch (err) {
                         outputBlock.innerText = "실행 중 오류가 발생했습니다: " + err.message;
                     } finally {
