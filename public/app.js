@@ -18,7 +18,7 @@ const apps = [
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>실행 결과</h3>
                     <div id="l2SuccessBox" style="display: none; align-items: center; gap: 8px;">
-                        <span style="color: var(--success-color); font-weight: bold;">하단 서버 핑 정상</span>
+                        <span style="color: var(--success-color); font-weight: bold;">하단서버 핑 정상</span>
                         <button id="copyL2SuccessBtn" class="btn" style="padding: 4px 12px; font-size: 0.85rem; background: rgba(255,255,255,0.1); color: var(--text-primary); height: auto; min-width: 80px;">복사 📋</button>
                     </div>
                 </div>
@@ -150,12 +150,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (copySuccessBtn) {
                 copySuccessBtn.addEventListener('click', async () => {
                     try {
-                        await navigator.clipboard.writeText('하단 서버 핑 정상');
+                        const copyText = '하단서버 핑 정상';
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(copyText);
+                        } else {
+                            // Fallback for non-HTTPS environments
+                            const textArea = document.createElement("textarea");
+                            textArea.value = copyText;
+                            textArea.style.position = "fixed";
+                            textArea.style.left = "-9999px";
+                            textArea.style.top = "0";
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            const successful = document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            if (!successful) throw new Error('Fallback copy failed');
+                        }
                         const originalText = copySuccessBtn.innerText;
                         copySuccessBtn.innerText = '복사됨 ✅';
                         setTimeout(() => copySuccessBtn.innerText = originalText, 1500);
                     } catch (err) {
-                        alert('복사 실패');
+                        alert('복사 실패: ' + err.message);
                     }
                 });
             }
