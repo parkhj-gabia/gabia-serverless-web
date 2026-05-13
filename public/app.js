@@ -11,7 +11,7 @@ const apps = [
                 <p style="color: var(--text-secondary); margin-top: 8px;">점검할 L2 스위치의 IP를 입력하고 실행 버튼을 눌러주세요.</p>
                 <div style="display: flex; gap: 12px; margin-top: 16px;">
                     <textarea id="l2IpInput" placeholder="IP 주소 또는 장애 내용 텍스트를 붙여넣으세요..." style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none; font-size: 1rem; resize: vertical; min-height: 48px; max-height: 200px;" rows="2"></textarea>
-                    <button class="btn btn-primary" id="runL2Btn" style="padding: 0 24px; height: fit-content; align-self: center;">점검 실행</button>
+                    <button class="btn btn-primary" id="runL2Btn" style="padding: 0 24px; font-weight: 700;">점검 실행</button>
                 </div>
             </div>
             <div class="app-card" style="margin-top: 16px; position: relative;">
@@ -43,6 +43,15 @@ const apps = [
         description: '독립 모듈로 동작하는 패스워드 자동 생성기입니다.',
         content: `
             <iframe src="App.buildpassword/index.html" style="width: 100%; height: 850px; border: none; background: transparent;"></iframe>
+        `
+    },
+    {
+        id: 'app4',
+        title: 'IP(TMS/ARP) 조회',
+        icon: '🔍',
+        description: 'TMS 및 ARPSpoofing IP 조회',
+        content: `
+            <iframe src="APP.ipcheck/index.html?v=3" style="width: 100%; height: 850px; border: none; background: transparent;"></iframe>
         `
     },
     {
@@ -116,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.offsetHeight; // trigger reflow
         appContent.style.animation = null;
 
-        if (app.id === 'app2') {
+        if (app.id === 'app2' || app.id === 'app4') {
             appContent.innerHTML = `
                 <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
                     ${app.content}
@@ -232,6 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
+
     // Firebase Auth State Listener
     const loginOverlay = document.getElementById('loginOverlay');
     const mainAppContainer = document.getElementById('mainAppContainer');
@@ -249,6 +260,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     loginOverlay.style.display = 'none';
                     mainAppContainer.style.display = 'flex';
                 }, 300);
+
+                if (!sessionStorage.getItem('hasLoggedLogin')) {
+                    sessionStorage.setItem('hasLoggedLogin', 'true');
+                    fetch('api/log-login', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${window.authToken}` }
+                    }).catch(err => console.error("Login logging failed:", err));
+                }
             } else {
                 // User is logged out
                 window.authToken = null;
@@ -358,6 +377,130 @@ document.addEventListener('DOMContentLoaded', () => {
                 l2Editor.value = "Error: " + err.message;
             });
     };
+
+    // ipcheck.list Modal Logic
+    const ipCheckModal = document.getElementById('ipCheckListModal');
+    const closeIpCheckModalBtn = document.getElementById('closeIpCheckListModal');
+    const saveIpCheckBtn = document.getElementById('saveIpCheckListBtn');
+    const ipCheckEditor = document.getElementById('ipCheckListEditor');
+    const saveIpCheckStatus = document.getElementById('ipCheckListSaveStatus');
+
+    if (closeIpCheckModalBtn) {
+        closeIpCheckModalBtn.addEventListener('click', () => {
+            ipCheckModal.classList.remove('active');
+        });
+    }
+
+    if (saveIpCheckBtn) {
+        saveIpCheckBtn.addEventListener('click', async () => {
+            const content = ipCheckEditor.value;
+            saveIpCheckBtn.disabled = true;
+            saveIpCheckStatus.innerText = "저장 중...";
+            saveIpCheckStatus.style.color = 'var(--text-secondary)';
+
+            try {
+                const response = await fetch('api/ipcheck-list', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${window.authToken}`
+                    },
+                    body: JSON.stringify({ content })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    saveIpCheckStatus.innerText = "저장되었습니다.";
+                    saveIpCheckStatus.style.color = '#10b981';
+                } else {
+                    saveIpCheckStatus.innerText = "저장 실패: " + (result.error || 'Unknown error');
+                    saveIpCheckStatus.style.color = '#ef4444';
+                }
+            } catch (err) {
+                saveIpCheckStatus.innerText = "오류 발생: " + err.message;
+                saveIpCheckStatus.style.color = '#ef4444';
+            } finally {
+                saveIpCheckBtn.disabled = false;
+                setTimeout(() => {
+                    if (saveIpCheckStatus.innerText === "저장되었습니다.") saveIpCheckStatus.innerText = "";
+                }, 3000);
+            }
+        });
+    }
+
+    window.openIpCheckListModal = function() {
+        if (!ipCheckModal) return;
+        
+        ipCheckEditor.value = "로딩 중...";
+        saveIpCheckStatus.innerText = "";
+        ipCheckModal.classList.add('active');
+
+        fetch('api/ipcheck-list', {
+            headers: { 'Authorization': `Bearer ${window.authToken}` }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.content !== undefined) {
+                    ipCheckEditor.value = data.content;
+                } else if (data.error) {
+                    ipCheckEditor.value = "Error loading list: " + data.error;
+                }
+            })
+            .catch(err => {
+                ipCheckEditor.value = "Error: " + err.message;
+            });
+    };
+
+    // Login Logs Modal Logic
+    const settingsBtn = document.getElementById('settingsBtn');
+    const loginLogsModal = document.getElementById('loginLogsModal');
+    const closeLoginLogsModal = document.getElementById('closeLoginLogsModal');
+    const loginLogsTableBody = document.getElementById('loginLogsTableBody');
+    const loginLogsLoading = document.getElementById('loginLogsLoading');
+
+    if (settingsBtn && loginLogsModal) {
+        settingsBtn.addEventListener('click', () => {
+            loginLogsModal.classList.add('active');
+            loginLogsTableBody.innerHTML = '';
+            loginLogsLoading.style.display = 'block';
+
+            fetch('api/login-logs', {
+                headers: { 'Authorization': `Bearer ${window.authToken}` }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    loginLogsLoading.style.display = 'none';
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            const tr = document.createElement('tr');
+                            tr.style.borderBottom = '1px solid var(--surface-hover)';
+                            
+                            const timeStr = log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Unknown';
+                            
+                            tr.innerHTML = `
+                                <td style="padding: 12px 8px;">${timeStr}</td>
+                                <td style="padding: 12px 8px;">${log.email || 'Unknown'}</td>
+                                <td style="padding: 12px 8px;">${log.ip || 'Unknown'}</td>
+                                <td style="padding: 12px 8px;">
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${log.userAgent || 'Unknown'}">${log.userAgent || 'Unknown'}</div>
+                                </td>
+                            `;
+                            loginLogsTableBody.appendChild(tr);
+                        });
+                    } else {
+                        loginLogsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">접속 기록이 없습니다.</td></tr>';
+                    }
+                })
+                .catch(err => {
+                    loginLogsLoading.style.display = 'none';
+                    loginLogsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #ef4444;">에러 발생: ${err.message}</td></tr>`;
+                });
+        });
+
+        closeLoginLogsModal.addEventListener('click', () => {
+            loginLogsModal.classList.remove('active');
+        });
+    }
 
     // Start
     initSidebar();

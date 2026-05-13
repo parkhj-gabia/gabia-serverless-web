@@ -31,6 +31,7 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/App.buildpassword', express.static(path.join(__dirname, 'App.buildpassword')));
+app.use('/APP.ipcheck', express.static(path.join(__dirname, 'APP.ipcheck')));
 
 // L2.list 파싱 유틸리티 함수
 function parseL2List(content, targetIp) {
@@ -186,6 +187,171 @@ app.post('/api/l2-list', authenticateUser, async (req, res) => {
             return res.json({ success: true });
         }
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 접속 기록 저장 API
+app.post('/api/log-login', authenticateUser, async (req, res) => {
+    if (!useFirestore) return res.json({ success: true, note: 'Firestore disabled' });
+
+    try {
+        const email = req.user.email || 'Unknown';
+        // 클라우드 환경에서는 x-forwarded-for 헤더를 통해 실제 IP를 가져옵니다.
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+        const logsRef = db.collection('login_logs');
+        await logsRef.add({
+            email,
+            ip,
+            userAgent,
+            timestamp,
+            createdAt: new Date().toISOString()
+        });
+
+        // 1000개 초과 시 오래된 기록 삭제
+        const snapshot = await logsRef.count().get();
+        const count = snapshot.data().count;
+
+        if (count > 1000) {
+            const excess = count - 1000;
+            const oldestDocs = await logsRef.orderBy('createdAt', 'asc').limit(excess).get();
+            const batch = db.batch();
+            oldestDocs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Login logging error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 접속 기록 조회 API
+app.get('/api/login-logs', authenticateUser, async (req, res) => {
+    if (!useFirestore) return res.json({ logs: [] });
+
+    try {
+        // 최근 100개만 조회 (UI 성능 및 데이터 보호)
+        const snapshot = await db.collection('login_logs')
+            .orderBy('createdAt', 'desc')
+            .limit(100)
+            .get();
+        
+        const logs = [];
+        snapshot.forEach(doc => {
+            logs.push({ id: doc.id, ...doc.data() });
+        });
+
+        res.json({ logs });
+    } catch (err) {
+        console.error("Fetch login logs error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ipcheck.list 내용 조회 API
+app.get('/api/ipcheck-list', authenticateUser, async (req, res) => {
+    try {
+        let content = '';
+        if (useFirestore) {
+            const doc = await db.collection('config').doc('ipchecklist').get();
+            content = doc.exists ? (doc.data().content || '') : '';
+        }
+        
+        if (!content) {
+            const listFilePath = path.join(__dirname, 'APP.ipcheck', 'ipcheck.list');
+            if (fs.existsSync(listFilePath)) {
+                content = fs.readFileSync(listFilePath, 'utf-8');
+            }
+        }
+        
+        return res.json({ content });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ipcheck.list 내용 저장 API
+app.post('/api/ipcheck-list', authenticateUser, async (req, res) => {
+    const { content } = req.body;
+    if (typeof content !== 'string') return res.status(400).json({ error: 'Invalid content' });
+
+    try {
+        if (useFirestore) {
+            await db.collection('config').doc('ipchecklist').set({ content });
+            return res.json({ success: true });
+        } else {
+            const listFilePath = path.join(__dirname, 'APP.ipcheck', 'ipcheck.list');
+            fs.writeFileSync(listFilePath, content, 'utf-8');
+            return res.json({ success: true });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// IP 조회 API
+app.post('/api/check-ip', authenticateUser, async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP is required' });
+
+    try {
+        let content = '';
+        if (useFirestore) {
+            const doc = await db.collection('config').doc('ipchecklist').get();
+            content = doc.exists ? (doc.data().content || '') : '';
+        }
+        
+        if (!content) {
+            const listFilePath = path.join(__dirname, 'APP.ipcheck', 'ipcheck.list');
+            if (fs.existsSync(listFilePath)) {
+                content = fs.readFileSync(listFilePath, 'utf-8');
+            }
+        }
+
+        const lines = content.split('\n');
+        let foundComment = null;
+        let matchedIp = null;
+
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine || trimmedLine.startsWith('###')) continue;
+            if (!trimmedLine.includes('#')) continue;
+
+            const parts = trimmedLine.split('#', 2);
+            const listIp = parts[0].trim();
+            const comment = parts[1].trim();
+
+            if (listIp === ip) {
+                matchedIp = listIp;
+                foundComment = comment;
+                break;
+            }
+
+            if (listIp.endsWith('.*')) {
+                const prefix = listIp.substring(0, listIp.length - 1); // e.g., '182.162.100.'
+                if (ip.startsWith(prefix)) {
+                    matchedIp = listIp;
+                    foundComment = comment;
+                    break;
+                }
+            }
+        }
+
+        if (foundComment) {
+            return res.json({ success: true, ip: matchedIp, comment: foundComment });
+        } else {
+            return res.json({ success: false, message: '리스트에서 해당 IP를 찾을 수 없습니다.' });
+        }
+
+    } catch (err) {
+        console.error("IP Check error:", err);
         res.status(500).json({ error: err.message });
     }
 });
