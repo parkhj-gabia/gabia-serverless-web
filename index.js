@@ -19,6 +19,13 @@ try {
     console.log("Firestore initialized successfully.");
 } catch (e) {
     console.log("Firestore initialization failed. Falling back to local file system for l2.list.");
+    // 인증 정보가 없어 실패한 경우, verifyIdToken을 정상적으로 수행하기 위해 명시적 프로젝트 ID로 초기화
+    try {
+        admin.initializeApp({ projectId: 'gabia-serverless-app' });
+        console.log("Firebase Admin initialized for token verification only.");
+    } catch (initErr) {
+        console.log("Token verification initialization failed:", initErr.message);
+    }
 }
 
 // Cloud Functions 등에서 서브경로로 접속 시 슬래시(/) 누락으로 인한 CSS 경로 깨짐 방지

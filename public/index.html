@@ -124,7 +124,7 @@
     <!-- Firebase App (the core Firebase SDK) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, onIdTokenChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
         // TODO: 사용자의 Firebase 설정으로 교체해야 합니다.
         const firebaseConfig = {
@@ -141,6 +141,7 @@
             window.signInWithPopup = signInWithPopup;
             window.signOut = signOut;
             window.onAuthStateChanged = onAuthStateChanged;
+            window.onIdTokenChanged = onIdTokenChanged;
         } catch(e) {
             console.error("Firebase SDK Load Error:", e);
         }

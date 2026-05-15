@@ -220,7 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         
                         const result = await response.json();
-                        outputBlock.innerText = result.output || result.error || "결과 없음";
+                        let errorMsg = result.error || "";
+                        if (result.details) errorMsg += `\n(상세: ${result.details})`;
+                        outputBlock.innerText = result.output || errorMsg || "결과 없음";
                         
                         if (result.allAlive && successBox) {
                             successBox.style.display = 'flex';
@@ -250,8 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logoutBtn');
     const loginErrorMsg = document.getElementById('loginErrorMsg');
 
-    if (window.onAuthStateChanged && window.firebaseAuth) {
-        window.onAuthStateChanged(window.firebaseAuth, async (user) => {
+    if (window.onIdTokenChanged && window.firebaseAuth) {
+        window.onIdTokenChanged(window.firebaseAuth, async (user) => {
             if (user) {
                 // User is logged in
                 window.authToken = await user.getIdToken();
