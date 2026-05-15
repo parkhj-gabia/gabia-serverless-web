@@ -210,11 +210,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     outputBlock.innerText = "서버 상태 확인 중...";
 
                     try {
+                        let currentToken = window.authToken;
+                        if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+                            currentToken = await window.firebaseAuth.currentUser.getIdToken();
+                            window.authToken = currentToken;
+                        }
+
                         const response = await fetch('api/run-l2', {
                             method: 'POST',
                             headers: { 
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${window.authToken}`
+                                'Authorization': `Bearer ${currentToken}`
                             },
                             body: JSON.stringify({ ip })
                         });
@@ -328,11 +334,17 @@ document.addEventListener('DOMContentLoaded', () => {
             saveL2Status.style.color = 'var(--text-secondary)';
 
             try {
+                let currentToken = window.authToken;
+                if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+                    currentToken = await window.firebaseAuth.currentUser.getIdToken();
+                    window.authToken = currentToken;
+                }
+
                 const response = await fetch('api/l2-list', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.authToken}`
+                        'Authorization': `Bearer ${currentToken}`
                     },
                     body: JSON.stringify({ content })
                 });
@@ -357,15 +369,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.openL2Modal = function() {
+    window.openL2Modal = async function() {
         if (!l2Modal) return;
         
         l2Editor.value = "로딩 중...";
         saveL2Status.innerText = "";
         l2Modal.classList.add('active');
 
+        let currentToken = window.authToken;
+        if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+            currentToken = await window.firebaseAuth.currentUser.getIdToken();
+            window.authToken = currentToken;
+        }
+
         fetch('api/l2-list', {
-            headers: { 'Authorization': `Bearer ${window.authToken}` }
+            headers: { 'Authorization': `Bearer ${currentToken}` }
         })
             .then(res => res.json())
             .then(data => {
