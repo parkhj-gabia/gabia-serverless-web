@@ -261,8 +261,8 @@
         </div>
 
         <div class="form-group">
-            <label for="genUserId">사용자 ID <span class="required">*</span> <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.85rem;">(5글자 이상)</span></label>
-            <input type="text" id="genUserId" placeholder="사용자 ID를 입력하세요">
+            <label for="genUserId">고객 ID <span class="required">*</span> <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.85rem;">(5글자 이상)</span></label>
+            <input type="text" id="genUserId" placeholder="고객 ID를 입력하세요">
         </div>
         
         <div class="form-group">
@@ -343,7 +343,7 @@
             resultBox.style.display = 'none';
 
             if (userId.length < 5) {
-                errorBox.innerText = "사용자 ID는 5글자 이상 입력해주세요.";
+                errorBox.innerText = "고객 ID는 5글자 이상 입력해주세요.";
                 errorBox.style.display = 'block';
                 return;
             }

@@ -2,7 +2,7 @@
 const apps = [
     {
         id: 'app1',
-        title: 'L2 핑 점검',
+        title: 'L2 하단서버 핑 점검',
         icon: '🖧',
         description: 'L2 스위치 및 하위 서버 상태 점검',
         content: `
@@ -42,7 +42,7 @@ const apps = [
         icon: '🔐',
         description: '독립 모듈로 동작하는 패스워드 자동 생성기입니다.',
         content: `
-            <iframe src="App.buildpassword/index.html" style="width: 100%; height: 850px; border: none; background: transparent;"></iframe>
+            <iframe src="App.buildpassword/index.html?v=2" style="width: 100%; height: 850px; border: none; background: transparent;"></iframe>
         `
     },
     {
