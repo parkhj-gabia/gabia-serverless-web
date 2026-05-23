@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (result.details) errorMsg += `\n(상세: ${result.details})`;
                         outputBlock.innerText = result.output || errorMsg || "결과 없음";
                         
-                        if (result.allAlive && successBox) {
+                        if (result.anyAlive && successBox) {
                             successBox.style.display = 'flex';
                         }
                     } catch (err) {

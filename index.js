@@ -71,6 +71,73 @@ function parseL2List(content, targetIp) {
     return { isFound, l2Comment, serverIps };
 }
 
+// GitHub 자동 백업 헬퍼 함수
+async function backupToGithub(filename, content, req) {
+    try {
+        if (!useFirestore) {
+            console.log("Firestore disabled, skipping Github backup.");
+            return;
+        }
+
+        const githubDoc = await db.collection('config').doc('github').get();
+        if (!githubDoc.exists) {
+            console.log("Github config not found in Firestore. Skipping backup.");
+            return;
+        }
+
+        const token = githubDoc.data().token;
+        if (!token) {
+            console.log("Github token is empty. Skipping backup.");
+            return;
+        }
+
+        const email = req.user?.email || 'Unknown';
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+
+        const repoOwner = 'parkhj-gabia';
+        const repoName = 'gabia-serverless-web';
+        const pathStr = `BACKUP.list/${filename}`;
+        const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${pathStr}`;
+
+        // Get file SHA if it exists
+        let sha = null;
+        try {
+            const getRes = await axios.get(url, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'gabia-serverless-web'
+                }
+            });
+            sha = getRes.data.sha;
+        } catch (getErr) {
+            // 404 is expected if file doesn't exist yet
+            if (getErr.response && getErr.response.status !== 404) {
+                console.error(`Error fetching file SHA from Github for ${filename}:`, getErr.message);
+            }
+        }
+
+        const base64Content = Buffer.from(content).toString('base64');
+        const commitMessage = `Backup ${filename}\n\nUser: ${email}\nIP: ${ip}\nAgent: ${userAgent}`;
+
+        await axios.put(url, {
+            message: commitMessage,
+            content: base64Content,
+            sha: sha || undefined
+        }, {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'gabia-serverless-web'
+            }
+        });
+        console.log(`Successfully backed up ${filename} to GitHub.`);
+    } catch (err) {
+        console.error(`Failed to backup ${filename} to GitHub:`, err.response?.data || err.message);
+    }
+}
+
 // 인증 미들웨어
 const authenticateUser = async (req, res, next) => {
     // 로컬 테스트나 Firebase Admin 초기화 실패 시 임시 통과 허용 (선택 사항이나, 클라우드에서는 강제)
@@ -141,18 +208,18 @@ app.post('/api/run-l2', authenticateUser, async (req, res) => {
             let outputText = headerText + '\n';
             outputText += '-'.repeat(50) + '\n';
             
-            let allAlive = results.length > 0;
+            let anyAlive = false;
             for (let r of results) {
                 if (r.alive) {
                     outputText += ` [OK] Alive : ${r.ip}\n`;
+                    anyAlive = true;
                 } else {
                     outputText += ` [XX] Dead  : ${r.ip}\n`;
-                    allAlive = false;
                 }
             }
             outputText += '-'.repeat(50) + '\n';
 
-            res.json({ output: outputText, allAlive });
+            res.json({ output: outputText, anyAlive, allAlive: anyAlive });
         } catch (workerErr) {
             res.json({ output: `[Error] Ping Worker VM API Failed.\nURL: ${workerUrl}\nMessage: ${workerErr.message}\nMake sure the worker.py is running.` });
         }
@@ -187,6 +254,7 @@ app.post('/api/l2-list', authenticateUser, async (req, res) => {
     try {
         if (useFirestore) {
             await db.collection('config').doc('l2list').set({ content });
+            await backupToGithub('l2.list', content, req);
             return res.json({ success: true });
         } else {
             const listFilePath = path.join(__dirname, 'App.L2', 'l2.list');
@@ -292,6 +360,7 @@ app.post('/api/ipcheck-list', authenticateUser, async (req, res) => {
     try {
         if (useFirestore) {
             await db.collection('config').doc('ipchecklist').set({ content });
+            await backupToGithub('ipcheck.list', content, req);
             return res.json({ success: true });
         } else {
             const listFilePath = path.join(__dirname, 'APP.ipcheck', 'ipcheck.list');
