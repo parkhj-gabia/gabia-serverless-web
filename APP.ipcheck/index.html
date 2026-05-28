@@ -67,7 +67,11 @@
                     
                     let authToken = null;
                     try {
-                        authToken = window.parent ? window.parent.authToken : null;
+                        if (window.parent && window.parent.getAuthToken) {
+                            authToken = await window.parent.getAuthToken();
+                        } else {
+                            authToken = window.parent ? window.parent.authToken : null;
+                        }
                     } catch (e) {
                         alert("창 접근 오류: " + e.message);
                         return;
@@ -95,6 +99,12 @@
                     
                     loadingIndicator.style.display = 'none';
                     
+                    if (response.status === 401 || data.error) {
+                        outputBlock.innerText = "유효하지 않은 키(인증 토큰)로 인해 데이터 파일을 로딩하지 못했습니다. 새로고침 후 다시 로그인해 주세요.";
+                        outputBlock.style.color = '#ef4444';
+                        return;
+                    }
+
                     if (data.success) {
                         outputBlock.innerText = `[Match Found]\nList IP: ${data.ip}\nComment: ${data.comment}`;
                     } else {

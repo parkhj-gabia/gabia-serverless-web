@@ -80,6 +80,19 @@ const apps = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
+    window.getAuthToken = async function() {
+        if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+            try {
+                const token = await window.firebaseAuth.currentUser.getIdToken();
+                window.authToken = token;
+                return token;
+            } catch (e) {
+                console.error("토큰 갱신 실패:", e);
+            }
+        }
+        return window.authToken;
+    };
+
     const appList = document.getElementById('appList');
     const appContent = document.getElementById('appContent');
     const loginBtn = document.getElementById('loginBtn');
@@ -210,11 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     outputBlock.innerText = "서버 상태 확인 중...";
 
                     try {
-                        let currentToken = window.authToken;
-                        if (window.firebaseAuth && window.firebaseAuth.currentUser) {
-                            currentToken = await window.firebaseAuth.currentUser.getIdToken();
-                            window.authToken = currentToken;
-                        }
+                        const currentToken = await window.getAuthToken();
 
                         const response = await fetch('api/run-l2', {
                             method: 'POST',
@@ -226,6 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         
                         const result = await response.json();
+                        if (response.status === 401 || result.error) {
+                            outputBlock.innerText = "유효하지 않은 키(인증 토큰)로 인해 데이터 파일을 로딩하지 못했습니다. 새로고침 후 다시 로그인해 주세요.";
+                            return;
+                        }
                         let errorMsg = result.error || "";
                         if (result.details) errorMsg += `\n(상세: ${result.details})`;
                         outputBlock.innerText = result.output || errorMsg || "결과 없음";
@@ -334,11 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveL2Status.style.color = 'var(--text-secondary)';
 
             try {
-                let currentToken = window.authToken;
-                if (window.firebaseAuth && window.firebaseAuth.currentUser) {
-                    currentToken = await window.firebaseAuth.currentUser.getIdToken();
-                    window.authToken = currentToken;
-                }
+                const currentToken = await window.getAuthToken();
 
                 const response = await fetch('api/l2-list', {
                     method: 'POST',
@@ -376,11 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveL2Status.innerText = "";
         l2Modal.classList.add('active');
 
-        let currentToken = window.authToken;
-        if (window.firebaseAuth && window.firebaseAuth.currentUser) {
-            currentToken = await window.firebaseAuth.currentUser.getIdToken();
-            window.authToken = currentToken;
-        }
+        const currentToken = await window.getAuthToken();
 
         fetch('api/l2-list', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
@@ -419,11 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
             saveIpCheckStatus.style.color = 'var(--text-secondary)';
 
             try {
+                const currentToken = await window.getAuthToken();
                 const response = await fetch('api/ipcheck-list', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.authToken}`
+                        'Authorization': `Bearer ${currentToken}`
                     },
                     body: JSON.stringify({ content })
                 });
@@ -448,15 +454,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.openIpCheckListModal = function() {
+    window.openIpCheckListModal = async function() {
         if (!ipCheckModal) return;
         
         ipCheckEditor.value = "로딩 중...";
         saveIpCheckStatus.innerText = "";
         ipCheckModal.classList.add('active');
 
+        const currentToken = await window.getAuthToken();
         fetch('api/ipcheck-list', {
-            headers: { 'Authorization': `Bearer ${window.authToken}` }
+            headers: { 'Authorization': `Bearer ${currentToken}` }
         })
             .then(res => res.json())
             .then(data => {
@@ -484,9 +491,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loginLogsTableBody.innerHTML = '';
             loginLogsLoading.style.display = 'block';
 
-            fetch('api/login-logs', {
-                headers: { 'Authorization': `Bearer ${window.authToken}` }
-            })
+            window.getAuthToken().then(currentToken => {
+                fetch('api/login-logs', {
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                })
                 .then(res => res.json())
                 .then(data => {
                     loginLogsLoading.style.display = 'none';
@@ -515,6 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     loginLogsLoading.style.display = 'none';
                     loginLogsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #ef4444;">에러 발생: ${err.message}</td></tr>`;
                 });
+            });
         });
 
         closeLoginLogsModal.addEventListener('click', () => {
