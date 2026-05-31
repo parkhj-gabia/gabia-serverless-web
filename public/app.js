@@ -56,25 +56,11 @@ const apps = [
     },
     {
         id: 'app3',
-        title: 'App 3',
-        icon: '📁',
-        description: '데이터베이스 및 스토리지 관리',
+        title: '야간인수인계 보고서',
+        icon: '📊',
+        description: '야간 업무 로그 파일 내용을 분석하여 인수인계 보고서를 자동 생성합니다.',
         content: `
-            <div class="app-card">
-                <h3>스토리지 사용량</h3>
-                <div style="margin-top: 16px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span>용량</span>
-                        <span>45GB / 100GB</span>
-                    </div>
-                    <div style="width: 100%; height: 8px; background: var(--surface-hover); border-radius: 4px; overflow: hidden;">
-                        <div style="width: 45%; height: 100%; background: var(--accent-color);"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="app-card" style="margin-top: 16px;">
-                <button class="btn btn-primary">데이터베이스 백업 실행</button>
-            </div>
+            <iframe src="APP.genreport/index.html?v=1" style="width: 100%; height: 950px; border: none; background: transparent;"></iframe>
         `
     }
 ];

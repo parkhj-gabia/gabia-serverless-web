@@ -39,6 +39,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/App.buildpassword', express.static(path.join(__dirname, 'App.buildpassword')));
 app.use('/APP.ipcheck', express.static(path.join(__dirname, 'APP.ipcheck')));
+app.use('/APP.genreport', express.static(path.join(__dirname, 'APP.genreport')));
 
 // L2.list 파싱 유틸리티 함수
 function parseL2List(content, targetIp) {
@@ -430,6 +431,42 @@ app.post('/api/check-ip', authenticateUser, async (req, res) => {
         console.error("IP Check error:", err);
         res.status(500).json({ error: err.message });
     }
+});
+
+// 야간인수인계 보고서 생성 API
+app.post('/api/genreport/generate', authenticateUser, (req, res) => {
+    const { workerName, date, dailyworkContent } = req.body;
+    if (!workerName || !dailyworkContent) {
+        return res.status(400).json({ error: 'workerName and dailyworkContent are required' });
+    }
+
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'APP.genreport', 'generate_report.py');
+
+    const pyProcess = spawn('python3', [scriptPath, workerName, date || '']);
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    pyProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+    });
+
+    pyProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+    });
+
+    pyProcess.on('close', (code) => {
+        if (code !== 0) {
+            console.error(`Python script exited with code ${code}. Stderr: ${stderrData}`);
+            return res.json({ success: false, message: stderrData || `Process exited with code ${code}` });
+        }
+        res.json({ success: true, content: stdoutData });
+    });
+
+    const inputPayload = JSON.stringify({ workerName, date, dailyworkContent });
+    pyProcess.stdin.write(inputPayload);
+    pyProcess.stdin.end();
 });
 
 app.get('*', (req, res) => {
