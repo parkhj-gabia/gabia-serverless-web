@@ -112,3 +112,11 @@ cd App.L2 && pip install -r requirements.txt && cd ..
 
 > [!NOTE]
 > Firestore 데이터베이스 자체는 최초 1회 GCP 콘솔 내 Firestore 메뉴에 진입하여 Native 모드로 데이터베이스를 활성화해두어야 정상 연동됩니다.
+
+### 3. 접속 주소 (URL)
+구글 클라우드에 배포가 완료되면 발급된 Cloud Functions 주소로 웹 브라우저를 통해 관제도구에 접근할 수 있습니다. 
+현재 설정된 프로젝트(`gabia-serverless-app`) 및 리전(`us-central1`) 기준의 기본 주소는 다음과 같습니다:
+
+* **웹사이트 접속 주소**: [https://us-central1-gabia-serverless-app.cloudfunctions.net/gabia-serverless-web](https://us-central1-gabia-serverless-app.cloudfunctions.net/gabia-serverless-web)
+
+*(참고: 프로젝트 ID나 배포 환경이 변경된 경우 구글 클라우드 콘솔의 Cloud Functions 메뉴에서 실제 발급된 URL을 확인하실 수 있습니다.)*
