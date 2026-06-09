@@ -7,6 +7,46 @@
     <!-- Google Fonts: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+    
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/keymap/vim.min.js"></script>
+
+    <style>
+        .CodeMirror {
+            height: 400px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            font-family: monospace;
+            text-align: left;
+        }
+        /* 라인 번호 색상 변경 */
+        .CodeMirror-linenumber {
+            color: #60a5fa !important; /* 밝은 파란색 계열 */
+        }
+        .CodeMirror-dialog {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border-top: 1px solid var(--border-color) !important;
+            padding: 8px !important;
+        }
+        .CodeMirror-dialog input {
+            background: var(--bg-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            outline: none;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
     <!-- Login Overlay -->
@@ -72,8 +112,9 @@
                     <button class="icon-btn" id="closeL2ListModal" style="margin-left: 8px; font-size: 1.2rem;">✕</button>
                 </div>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="position: relative;">
                 <textarea id="l2ListEditor" spellcheck="false" style="width: 100%; height: 400px; background: #000; color: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 0.9rem; resize: vertical; outline: none;"></textarea>
+                <div id="l2VimStatus" style="position: absolute; bottom: 20px; right: 24px; background: #fbbf24; color: #000; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 0.85rem; pointer-events: none; z-index: 10;">-- NORMAL --</div>
             </div>
         </div>
     </div>
@@ -89,8 +130,9 @@
                     <button class="icon-btn" id="closeIpCheckListModal" style="margin-left: 8px; font-size: 1.2rem;">✕</button>
                 </div>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="position: relative;">
                 <textarea id="ipCheckListEditor" spellcheck="false" style="width: 100%; height: 400px; background: #000; color: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 0.9rem; resize: vertical; outline: none;"></textarea>
+                <div id="ipCheckVimStatus" style="position: absolute; bottom: 20px; right: 24px; background: #fbbf24; color: #000; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 0.85rem; pointer-events: none; z-index: 10;">-- NORMAL --</div>
             </div>
         </div>
     </div>
@@ -146,6 +188,6 @@
             console.error("Firebase SDK Load Error:", e);
         }
     </script>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>

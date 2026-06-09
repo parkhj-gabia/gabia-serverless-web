@@ -313,6 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Modal Logic
+    let l2CodeMirror = null;
+    let ipCheckCodeMirror = null;
+
     const l2Modal = document.getElementById('l2ListModal');
     const closeL2ModalBtn = document.getElementById('closeL2ListModal');
     const saveL2Btn = document.getElementById('saveL2ListBtn');
@@ -327,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (saveL2Btn) {
         saveL2Btn.addEventListener('click', async () => {
-            const content = l2Editor.value;
+            const content = l2CodeMirror ? l2CodeMirror.getValue() : l2Editor.value;
             saveL2Btn.disabled = true;
             saveL2Status.innerText = "저장 중...";
             saveL2Status.style.color = 'var(--text-secondary)';
@@ -367,9 +370,33 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openL2Modal = async function() {
         if (!l2Modal) return;
         
-        l2Editor.value = "로딩 중...";
+        if (!l2CodeMirror && l2Editor) {
+            l2CodeMirror = CodeMirror.fromTextArea(l2Editor, {
+                lineNumbers: true,
+                theme: "monokai",
+                keyMap: "vim"
+            });
+            CodeMirror.Vim.defineEx("write", "w", function() {
+                if (saveL2Btn) saveL2Btn.click();
+            });
+            CodeMirror.on(l2CodeMirror, 'vim-mode-change', function(e) {
+                const statusEl = document.getElementById('l2VimStatus');
+                if (statusEl) {
+                    statusEl.innerText = '-- ' + (e.mode || '').toUpperCase() + ' --';
+                    if (e.subMode) {
+                        statusEl.innerText = '-- ' + e.mode.toUpperCase() + ' ' + e.subMode.toUpperCase() + ' --';
+                    }
+                }
+            });
+        }
+        
+        if (l2CodeMirror) l2CodeMirror.setValue("로딩 중...");
+        else l2Editor.value = "로딩 중...";
+        
         saveL2Status.innerText = "";
         l2Modal.classList.add('active');
+        
+        setTimeout(() => { if (l2CodeMirror) l2CodeMirror.refresh(); }, 50);
 
         const currentToken = await window.getAuthToken();
 
@@ -379,13 +406,18 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 if (data.content !== undefined) {
-                    l2Editor.value = data.content;
+                    if (l2CodeMirror) l2CodeMirror.setValue(data.content);
+                    else l2Editor.value = data.content;
                 } else if (data.error) {
-                    l2Editor.value = "Error loading list: " + data.error;
+                    const errStr = "Error loading list: " + data.error;
+                    if (l2CodeMirror) l2CodeMirror.setValue(errStr);
+                    else l2Editor.value = errStr;
                 }
             })
             .catch(err => {
-                l2Editor.value = "Error: " + err.message;
+                const errStr = "Error: " + err.message;
+                if (l2CodeMirror) l2CodeMirror.setValue(errStr);
+                else l2Editor.value = errStr;
             });
     };
 
@@ -404,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (saveIpCheckBtn) {
         saveIpCheckBtn.addEventListener('click', async () => {
-            const content = ipCheckEditor.value;
+            const content = ipCheckCodeMirror ? ipCheckCodeMirror.getValue() : ipCheckEditor.value;
             saveIpCheckBtn.disabled = true;
             saveIpCheckStatus.innerText = "저장 중...";
             saveIpCheckStatus.style.color = 'var(--text-secondary)';
@@ -443,9 +475,33 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openIpCheckListModal = async function() {
         if (!ipCheckModal) return;
         
-        ipCheckEditor.value = "로딩 중...";
+        if (!ipCheckCodeMirror && ipCheckEditor) {
+            ipCheckCodeMirror = CodeMirror.fromTextArea(ipCheckEditor, {
+                lineNumbers: true,
+                theme: "monokai",
+                keyMap: "vim"
+            });
+            CodeMirror.Vim.defineEx("write", "w", function() {
+                if (saveIpCheckBtn) saveIpCheckBtn.click();
+            });
+            CodeMirror.on(ipCheckCodeMirror, 'vim-mode-change', function(e) {
+                const statusEl = document.getElementById('ipCheckVimStatus');
+                if (statusEl) {
+                    statusEl.innerText = '-- ' + (e.mode || '').toUpperCase() + ' --';
+                    if (e.subMode) {
+                        statusEl.innerText = '-- ' + e.mode.toUpperCase() + ' ' + e.subMode.toUpperCase() + ' --';
+                    }
+                }
+            });
+        }
+        
+        if (ipCheckCodeMirror) ipCheckCodeMirror.setValue("로딩 중...");
+        else ipCheckEditor.value = "로딩 중...";
+        
         saveIpCheckStatus.innerText = "";
         ipCheckModal.classList.add('active');
+        
+        setTimeout(() => { if (ipCheckCodeMirror) ipCheckCodeMirror.refresh(); }, 50);
 
         const currentToken = await window.getAuthToken();
         fetch('api/ipcheck-list', {
@@ -454,13 +510,18 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 if (data.content !== undefined) {
-                    ipCheckEditor.value = data.content;
+                    if (ipCheckCodeMirror) ipCheckCodeMirror.setValue(data.content);
+                    else ipCheckEditor.value = data.content;
                 } else if (data.error) {
-                    ipCheckEditor.value = "Error loading list: " + data.error;
+                    const errStr = "Error loading list: " + data.error;
+                    if (ipCheckCodeMirror) ipCheckCodeMirror.setValue(errStr);
+                    else ipCheckEditor.value = errStr;
                 }
             })
             .catch(err => {
-                ipCheckEditor.value = "Error: " + err.message;
+                const errStr = "Error: " + err.message;
+                if (ipCheckCodeMirror) ipCheckCodeMirror.setValue(errStr);
+                else ipCheckEditor.value = errStr;
             });
     };
 
