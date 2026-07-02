@@ -62,6 +62,15 @@ const apps = [
         content: `
             <iframe src="APP.genreport/index.html?v=1" style="width: 100%; height: 950px; border: none; background: transparent;"></iframe>
         `
+    },
+    {
+        id: 'app5',
+        title: '비동기 대용량 핑',
+        icon: '⚡',
+        description: '많은수의 서버를 30초 주기로 비동기 핑 모니터링',
+        content: `
+            <iframe src="APP.ping/index.html" style="width: 100%; height: 950px; border: none; background: transparent;"></iframe>
+        `
     }
 ];
 
@@ -296,6 +305,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     loginErrorMsg.innerText = "로그인 에러: " + error.message;
                     loginErrorMsg.style.display = 'block';
                 }
+            });
+        }
+
+        // Bypass Action for local development
+        const bypassLoginBtn = document.getElementById('bypassLoginBtn');
+        if (bypassLoginBtn) {
+            bypassLoginBtn.addEventListener('click', () => {
+                window.authToken = 'local-dev-token';
+                loginOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    loginOverlay.style.display = 'none';
+                    mainAppContainer.style.display = 'flex';
+                }, 300);
             });
         }
 

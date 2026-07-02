@@ -39,15 +39,26 @@ gcloud compute firewall-rules create allow-ping-worker-5000 \
     --source-ranges=0.0.0.0/0 \
     2>/dev/null || echo "방화벽 규칙이 이미 존재합니다. 넘어갑니다."
 
-echo -e "\n▶ 3. 무료 티어 가상머신(Ping Worker) 생성 중..."
-gcloud compute instances create $VM_NAME \
-    --project=$PROJECT_ID \
-    --zone=$ZONE \
-    --machine-type=e2-micro \
-    --network-interface=network-tier=PREMIUM,subnet=default \
-    --metadata-from-file startup-script=vm-startup.sh \
-    --tags=ping-worker \
-    2>/dev/null || echo "가상머신이 이미 존재합니다. 넘어갑니다."
+echo -e "\n▶ 3. 무료 티어 가상머신(Ping Worker) 생성 및 업데이트 중..."
+if gcloud compute instances describe $VM_NAME --zone=$ZONE --project=$PROJECT_ID &>/dev/null; then
+    echo "가상머신이 이미 존재합니다. 스타트업 스크립트 메타데이터를 업데이트합니다..."
+    gcloud compute instances add-metadata $VM_NAME \
+        --project=$PROJECT_ID \
+        --zone=$ZONE \
+        --metadata-from-file startup-script=vm-startup.sh
+    echo "가상머신을 재부팅하여 새 설정을 적용합니다 (약 30초 소요)..."
+    gcloud compute instances reset $VM_NAME \
+        --project=$PROJECT_ID \
+        --zone=$ZONE
+else
+    gcloud compute instances create $VM_NAME \
+        --project=$PROJECT_ID \
+        --zone=$ZONE \
+        --machine-type=e2-micro \
+        --network-interface=network-tier=PREMIUM,subnet=default \
+        --metadata-from-file startup-script=vm-startup.sh \
+        --tags=ping-worker
+fi
 
 echo -e "\n▶ 4. 가상머신의 고정 IP 추출 중..."
 VM_IP=$(gcloud compute instances describe $VM_NAME \

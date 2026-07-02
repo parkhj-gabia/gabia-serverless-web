@@ -40,6 +40,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/App.buildpassword', express.static(path.join(__dirname, 'App.buildpassword')));
 app.use('/APP.ipcheck', express.static(path.join(__dirname, 'APP.ipcheck')));
 app.use('/APP.genreport', express.static(path.join(__dirname, 'APP.genreport')));
+app.use('/APP.ping', express.static(path.join(__dirname, 'APP.ping')));
 
 // L2.list 파싱 유틸리티 함수
 function parseL2List(content, targetIp) {
@@ -141,17 +142,19 @@ async function backupToGithub(filename, content, req) {
 
 // 인증 미들웨어
 const authenticateUser = async (req, res, next) => {
-    // 로컬 테스트나 Firebase Admin 초기화 실패 시 임시 통과 허용 (선택 사항이나, 클라우드에서는 강제)
-    if (!useFirestore) {
-        // return next(); // 주석 해제 시 로컬 개발 중에는 인증을 무시합니다.
+    const authHeader = req.headers.authorization;
+    const idToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1] : null;
+
+    // 로컬 테스트나 Firebase Admin 초기화 실패 시 또는 로컬 토큰 사용 시 임시 통과 허용
+    if (!useFirestore || idToken === 'local-dev-token') {
+        req.user = { email: 'local-dev@gabia.com' };
+        return next();
     }
 
-    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: '인증 토큰이 없습니다.' });
     }
 
-    const idToken = authHeader.split('Bearer ')[1];
     try {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         req.user = decodedToken;
@@ -226,6 +229,44 @@ app.post('/api/run-l2', authenticateUser, async (req, res) => {
         }
     } catch (err) {
         res.json({ output: `[System Error] ${err.message}` });
+    }
+});
+
+// Worker IP/Port 조회 API
+app.get('/api/worker-config', authenticateUser, (req, res) => {
+    const workerUrl = process.env.WORKER_API_URL || 'http://127.0.0.1:5000/ping';
+    res.json({ workerUrl });
+});
+
+// Worker Status Proxy API
+app.post('/api/worker-status-proxy', authenticateUser, async (req, res) => {
+    const { worker_ip, worker_port } = req.body;
+    if (!worker_ip || !worker_port) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const targetUrl = `http://${worker_ip}:${worker_port}/status`;
+    try {
+        const response = await axios.get(targetUrl, { timeout: 4000 });
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: `Proxy failed to connect to worker: ${err.message}` });
+    }
+});
+
+// Worker Ping Proxy API
+app.post('/api/worker-ping-proxy', authenticateUser, async (req, res) => {
+    const { worker_ip, worker_port, server_ips } = req.body;
+    if (!worker_ip || !worker_port || !server_ips) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const targetUrl = `http://${worker_ip}:${worker_port}/ping`;
+    try {
+        const response = await axios.post(targetUrl, { server_ips }, { timeout: 12000 });
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: `Proxy failed to connect to worker: ${err.message}` });
     }
 });
 

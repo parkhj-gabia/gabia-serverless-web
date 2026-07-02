@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>비동기 대용량 핑 모니터링</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Modern Design System based on Slate theme */
+        :root {
+            --bg-color: #0f172a; /* Slate 900 */
+            --surface-color: #1e293b; /* Slate 800 */
+            --surface-hover: #334155; /* Slate 700 */
+            --border-color: #334155;
+            --text-primary: #f8fafc; /* Slate 50 */
+            --text-secondary: #94a3b8; /* Slate 400 */
+            --accent-color: #3b82f6; /* Blue 500 */
+            --accent-hover: #2563eb; /* Blue 600 */
+            --success-color: #10b981; /* Emerald 500 */
+            --success-bg: rgba(16, 185, 129, 0.1);
+            --danger-color: #ef4444; /* Red 500 */
+            --danger-bg: rgba(239, 68, 68, 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --transition: all 0.25s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: transparent; /* Seamless iframe integration */
+            color: var(--text-primary);
+            padding: 24px;
+            line-height: 1.6;
+        }
+
+        /* App Layout Containers */
+        .ping-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Glassmorphism Cards */
+        .card {
+            background-color: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Flex Headers */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Form Inputs & Settings */
+        .settings-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 180px;
+            flex: 1;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .form-control {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--surface-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-online {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: var(--success-color);
+        }
+
+        .status-offline {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--danger-color);
+        }
+
+        .status-idle {
+            background-color: rgba(148, 163, 184, 0.2);
+            color: var(--text-secondary);
+        }
+
+        /* Collapsible List Container */
+        .textarea-container {
+            transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+        }
+
+        .textarea-container.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .collapsed-summary {
+            background-color: rgba(59, 130, 246, 0.1);
+            border: 1px dashed var(--accent-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            color: var(--accent-color);
+            cursor: pointer;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--transition);
+        }
+
+        .collapsed-summary:hover {
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-total { color: var(--accent-color); }
+        .stat-success { color: var(--success-color); }
+        .stat-failed { color: var(--danger-color); }
+
+        /* Dual-Pane Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .pane {
+            display: flex;
+            flex-direction: column;
+            height: 550px;
+        }
+
+        .pane-header {
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 14px 16px;
+            border-top-left-radius: var(--radius-md);
+            border-top-right-radius: var(--radius-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .pane-success-header {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .pane-failed-header {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .pane-body {
+            background-color: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-bottom-left-radius: var(--radius-md);
+            border-bottom-right-radius: var(--radius-md);
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Ping Host Row Cards */
+        .host-card {
+            background-color: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            animation: slideIn 0.25s ease-out;
+        }
+
+        .host-card:hover {
+            background-color: var(--surface-hover);
+        }
+
+        .host-card.success-card {
+            border-left: 4px solid var(--success-color);
+        }
+
+        .host-card.failed-card {
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .host-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .host-ip {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 700;
+        }
+
+        .host-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .host-status {
+            text-align: right;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .host-success-status {
+            color: var(--success-color);
+        }
+
+        .host-failed-status {
+            color: var(--danger-color);
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Scrollbar customization */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Countdown display */
+        .countdown-info {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="ping-container">
+    <!-- 1. Connection Configurations -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">📡 워커(Worker) 서버 설정</div>
+            <div id="workerStatusBadge" class="status-badge status-idle">연결 대기중</div>
+        </div>
+        <div class="settings-grid">
+            <div class="form-group">
+                <label for="workerIp">워커 서버 IP</label>
+                <input type="text" id="workerIp" class="form-control" value="127.0.0.1" placeholder="예: 127.0.0.1">
+            </div>
+            <div class="form-group">
+                <label for="workerPort">포트 (Port)</label>
+                <input type="text" id="workerPort" class="form-control" value="5000" placeholder="예: 5000">
+            </div>
+            <div style="display: flex; gap: 8px; align-self: flex-end; margin-top: 6px;">
+                <button id="testConnectionBtn" class="btn btn-secondary">연결 테스트</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Target Server Input Panel (Collapsible) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">📝 점검 대상 IP 리스트</div>
+            <button id="toggleInputBtn" class="btn btn-secondary btn-sm" style="display: none;">접기 🔼</button>
+        </div>
+        
+        <!-- Collapsed view element -->
+        <div id="collapsedSummary" class="collapsed-summary" title="클릭해서 편집하기">
+            <span>등록된 서버 리스트 편집 (<strong id="collapsedCount">0</strong>개 IP)</span>
+            <button class="btn btn-secondary btn-sm">펼치기 🔽</button>
+        </div>
+
+        <div id="textareaContainer" class="textarea-container">
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 10px;">
+                줄바꿈(Enter) 또는 쉼표(,) 등으로 구분하여 감시 대상 IP/도메인을 입력해 주세요.
+            </p>
+            <textarea id="targetListInput" class="form-control" rows="8" style="width: 100%; font-family: monospace; resize: vertical;" placeholder="1.1.1.1&#10;8.8.8.8&#10;example.com"></textarea>
+            <div style="display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end;">
+                <button id="startMonitoringBtn" class="btn btn-primary">⚡ 모니터링 시작</button>
+                <button id="stopMonitoringBtn" class="btn btn-danger" style="display: none;">🛑 모니터링 중지</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Real-time Status Counts -->
+    <div class="stats-panel">
+        <div class="stat-card">
+            <div class="stat-label">전체 대상 수</div>
+            <div id="totalCount" class="stat-value stat-total">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">정상 (Ping OK)</div>
+            <div id="successCount" class="stat-value stat-success">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">장애 (Ping Fail)</div>
+            <div id="failedCount" class="stat-value stat-failed">0</div>
+        </div>
+    </div>
+
+    <div id="countdownInfo" class="countdown-info" style="display: none;"></div>
+
+    <!-- 4. Dual Panes (Success vs Failed) -->
+    <div class="dashboard-grid">
+        <!-- Success Pane -->
+        <div class="pane">
+            <div class="pane-header pane-success-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>정상 리스트 (Success)</span>
+                    <button id="copySuccessBtn" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); font-weight: normal; margin-top: 1px;">복사 📋</button>
+                </div>
+                <span id="paneSuccessCount">0</span>
+            </div>
+            <div id="successPaneBody" class="pane-body">
+                <!-- Dynamic cards injected here -->
+                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
+                    대기중...
+                </div>
+            </div>
+        </div>
+
+        <!-- Failed Pane -->
+        <div class="pane">
+            <div class="pane-header pane-failed-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>장애 리스트 (Failed)</span>
+                    <button id="copyFailedBtn" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); font-weight: normal; margin-top: 1px;">복사 📋</button>
+                </div>
+                <span id="paneFailedCount">0</span>
+            </div>
+            <div id="failedPaneBody" class="pane-body">
+                <!-- Dynamic cards injected here -->
+                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
+                    대기중...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State Variables
+    let isMonitoring = false;
+    let monitoringIntervalId = null;
+    let countdownIntervalId = null;
+    let serverStates = {}; // key: IP/Host, value: { alive: bool, latency: float, method: str, lastChecked: Date }
+    let serverList = []; // Array of clean IPs
+    let countdownSeconds = 30;
+
+    // DOM Elements
+    const workerIpInput = document.getElementById('workerIp');
+    const workerPortInput = document.getElementById('workerPort');
+    const testConnectionBtn = document.getElementById('testConnectionBtn');
+    const workerStatusBadge = document.getElementById('workerStatusBadge');
+
+    const targetListInput = document.getElementById('targetListInput');
+    const textareaContainer = document.getElementById('textareaContainer');
+    const toggleInputBtn = document.getElementById('toggleInputBtn');
+    const collapsedSummary = document.getElementById('collapsedSummary');
+    const collapsedCount = document.getElementById('collapsedCount');
+    
+    const startMonitoringBtn = document.getElementById('startMonitoringBtn');
+    const stopMonitoringBtn = document.getElementById('stopMonitoringBtn');
+
+    const totalCountEl = document.getElementById('totalCount');
+    const successCountEl = document.getElementById('successCount');
+    const failedCountEl = document.getElementById('failedCount');
+    const paneSuccessCountEl = document.getElementById('paneSuccessCount');
+    const paneFailedCountEl = document.getElementById('paneFailedCount');
+    
+    const successPaneBody = document.getElementById('successPaneBody');
+    const failedPaneBody = document.getElementById('failedPaneBody');
+    const countdownInfo = document.getElementById('countdownInfo');
+
+    const copySuccessBtn = document.getElementById('copySuccessBtn');
+    const copyFailedBtn = document.getElementById('copyFailedBtn');
+
+    // Clipboard copy helper
+    async function copyToClipboard(text) {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            }
+        } catch (err) {
+            console.error('복사 중 에러 발생: ', err);
+            return false;
+        }
+    }
+
+    // Copy Event Listeners
+    copySuccessBtn.addEventListener('click', async () => {
+        const successIps = Object.entries(serverStates)
+            .filter(([_, state]) => state.alive === true)
+            .map(([rawLine, _]) => rawLine)
+            .join('\n');
+            
+        if (!successIps) {
+            alert('복사할 정상 상태의 IP가 없습니다.');
+            return;
+        }
+        
+        const success = await copyToClipboard(successIps);
+        if (success) {
+            const originalText = copySuccessBtn.innerText;
+            copySuccessBtn.innerText = '복사됨 ✅';
+            setTimeout(() => copySuccessBtn.innerText = originalText, 1500);
+        }
+    });
+
+    copyFailedBtn.addEventListener('click', async () => {
+        const failedIps = Object.entries(serverStates)
+            .filter(([_, state]) => state.alive === false || state.alive === null)
+            .map(([rawLine, _]) => rawLine)
+            .join('\n');
+            
+        if (!failedIps) {
+            alert('복사할 장애 상태의 IP가 없습니다.');
+            return;
+        }
+        
+        const success = await copyToClipboard(failedIps);
+        if (success) {
+            const originalText = copyFailedBtn.innerText;
+            copyFailedBtn.innerText = '복사됨 ✅';
+            setTimeout(() => copyFailedBtn.innerText = originalText, 1500);
+        }
+    });
+
+    // Initialize from LocalStorage or server default
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedIp = localStorage.getItem('ping_worker_ip');
+        const savedPort = localStorage.getItem('ping_worker_port');
+        const savedList = localStorage.getItem('ping_target_list');
+
+        if (savedList) targetListInput.value = savedList;
+
+        if (savedIp && savedPort) {
+            workerIpInput.value = savedIp;
+            workerPortInput.value = savedPort;
+            testWorkerConnection();
+        } else {
+            // No local storage config, fetch default from Google Cloud env vars via Express API
+            const parentAuthToken = window.parent.authToken || '';
+            fetch('../api/worker-config', {
+                headers: {
+                    'Authorization': `Bearer ${parentAuthToken}`
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.workerUrl) {
+                    try {
+                        const url = new URL(data.workerUrl);
+                        workerIpInput.value = url.hostname;
+                        workerPortInput.value = url.port || '80';
+                    } catch (e) {
+                        console.error('Failed to parse workerUrl:', e);
+                        workerIpInput.value = '127.0.0.1';
+                        workerPortInput.value = '5000';
+                    }
+                } else {
+                    workerIpInput.value = '127.0.0.1';
+                    workerPortInput.value = '5000';
+                }
+                testWorkerConnection();
+            })
+            .catch(err => {
+                console.error('Failed to fetch default worker config:', err);
+                workerIpInput.value = '127.0.0.1';
+                workerPortInput.value = '5000';
+                testWorkerConnection();
+            });
+        }
+    });
+
+    // Save configurations
+    function saveConfigs() {
+        localStorage.setItem('ping_worker_ip', workerIpInput.value.trim());
+        localStorage.setItem('ping_worker_port', workerPortInput.value.trim());
+        localStorage.setItem('ping_target_list', targetListInput.value);
+    }
+
+    // Test Worker Connection
+    async function testWorkerConnection() {
+        const ip = workerIpInput.value.trim();
+        const port = workerPortInput.value.trim();
+        const parentAuthToken = window.parent.authToken || '';
+
+        workerStatusBadge.className = 'status-badge status-idle';
+        workerStatusBadge.textContent = '확인 중...';
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+
+            // Fetch via backend status proxy to avoid HTTPS Mixed Content block
+            const res = await fetch('../api/worker-status-proxy', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${parentAuthToken}`
+                },
+                body: JSON.stringify({ worker_ip: ip, worker_port: port }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+                const data = await res.json();
+                const privilegeStr = data.has_raw_privilege ? '(Raw)' : '(Fallback)';
+                workerStatusBadge.className = 'status-badge status-online';
+                workerStatusBadge.textContent = `온라인 ${privilegeStr}`;
+                saveConfigs();
+                return true;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        workerStatusBadge.className = 'status-badge status-offline';
+        workerStatusBadge.textContent = '오프라인 (연결 실패)';
+        return false;
+    }
+
+    testConnectionBtn.addEventListener('click', testWorkerConnection);
+
+    // Collapsible Logic
+    function setInputCollapsed(shouldCollapse) {
+        if (shouldCollapse) {
+            textareaContainer.classList.add('collapsed');
+            collapsedSummary.style.display = 'flex';
+            toggleInputBtn.style.display = 'none';
+            
+            // Clean and count list
+            const cleanList = parseInputList();
+            collapsedCount.textContent = cleanList.length;
+        } else {
+            textareaContainer.classList.remove('collapsed');
+            collapsedSummary.style.display = 'none';
+            toggleInputBtn.style.display = 'inline-flex';
+            toggleInputBtn.textContent = '접기 🔼';
+        }
+    }
+
+    toggleInputBtn.addEventListener('click', () => setInputCollapsed(true));
+    collapsedSummary.addEventListener('click', () => setInputCollapsed(false));
+
+    // Extract IP or Domain name from the line (ignoring comments/spaces)
+    function extractIp(line) {
+        const match = line.match(/^([a-zA-Z0-9.:-]+)/);
+        return match ? match[1] : line;
+    }
+
+    // Parse input IPs list
+    function parseInputList() {
+        const text = targetListInput.value;
+        // Split strictly by newlines to preserve comments on the same line
+        return text.split(/\r?\n/)
+            .map(item => item.trim())
+            .filter(item => item.length > 0);
+    }
+
+    // Monitoring Trigger Start/Stop
+    startMonitoringBtn.addEventListener('click', async () => {
+        // Validate worker connection first
+        const isOnline = await testWorkerConnection();
+        if (!isOnline) {
+            alert('워커 서버에 연결할 수 없습니다. IP/Port 설정을 확인하고 워커 실행 명령을 실행하세요.');
+            return;
+        }
+
+        serverList = parseInputList();
+        if (serverList.length === 0) {
+            alert('점검할 대상 IP 또는 호스트를 1개 이상 입력해 주세요.');
+            return;
+        }
+
+        // Initialize state mapping
+        serverList.forEach(rawLine => {
+            if (!serverStates[rawLine]) {
+                serverStates[rawLine] = {
+                    alive: null,
+                    latency: null,
+                    method: '',
+                    lastChecked: null
+                };
+            }
+        });
+
+        // Clean obsolete IPs from state if they were deleted from input
+        Object.keys(serverStates).forEach(rawLine => {
+            if (!serverList.includes(rawLine)) {
+                delete serverStates[rawLine];
+            }
+        });
+
+        isMonitoring = true;
+        saveConfigs();
+        setInputCollapsed(true);
+
+        startMonitoringBtn.style.display = 'none';
+        stopMonitoringBtn.style.display = 'inline-flex';
+        countdownInfo.style.display = 'block';
+
+        // Run immediately, then start interval
+        runPingCycle();
+    });
+
+    stopMonitoringBtn.addEventListener('click', stopMonitoring);
+
+    function stopMonitoring() {
+        isMonitoring = false;
+        if (monitoringIntervalId) clearInterval(monitoringIntervalId);
+        if (countdownIntervalId) clearInterval(countdownIntervalId);
+
+        startMonitoringBtn.style.display = 'inline-flex';
+        stopMonitoringBtn.style.display = 'none';
+        countdownInfo.style.display = 'none';
+        
+        setInputCollapsed(false);
+        workerStatusBadge.className = 'status-badge status-idle';
+        workerStatusBadge.textContent = '연결 대기중';
+    }
+
+    // Batching & Dispatch Ping calls
+    async function runPingCycle() {
+        if (!isMonitoring) return;
+
+        countdownInfo.textContent = '🔍 핑 분석 진행중...';
+        
+        const ip = workerIpInput.value.trim();
+        const port = workerPortInput.value.trim();
+        const parentAuthToken = window.parent.authToken || '';
+
+        // Chunk size is 20
+        const CHUNK_SIZE = 20;
+        const batches = [];
+        for (let i = 0; i < serverList.length; i += CHUNK_SIZE) {
+            batches.push(serverList.slice(i, i + CHUNK_SIZE));
+        }
+
+        // Concurrently run all batch API calls (Asynchronous batching)
+        const fetchPromises = batches.map(async (batch) => {
+            // Map extracted IP -> list of original raw lines
+            const ipToRawMap = {};
+            batch.forEach(rawLine => {
+                const cleanIp = extractIp(rawLine);
+                if (!ipToRawMap[cleanIp]) ipToRawMap[cleanIp] = [];
+                ipToRawMap[cleanIp].push(rawLine);
+            });
+
+            const ipBatch = Object.keys(ipToRawMap);
+
+            try {
+                // Fetch via backend ping proxy to avoid HTTPS Mixed Content block
+                const res = await fetch('../api/worker-ping-proxy', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${parentAuthToken}`
+                    },
+                    body: JSON.stringify({ 
+                        worker_ip: ip, 
+                        worker_port: port, 
+                        server_ips: ipBatch 
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const mappedResults = [];
+                    (data.results || []).forEach(r => {
+                        const rawLines = ipToRawMap[r.ip] || [];
+                        rawLines.forEach(rawLine => {
+                            mappedResults.push({
+                                rawLine: rawLine,
+                                alive: r.alive,
+                                latency: r.latency,
+                                method: r.method
+                            });
+                        });
+                    });
+                    return mappedResults;
+                }
+            } catch (err) {
+                console.error(`Batch ping failed for targets: ${batch.join(', ')}`, err);
+                // Return failed results mapping on connection error
+                return batch.map(rawLine => ({
+                    rawLine: rawLine,
+                    alive: false,
+                    latency: null,
+                    method: 'error'
+                }));
+            }
+            return [];
+        });
+
+        // Resolve all batches asynchronously
+        const batchResults = await Promise.all(fetchPromises);
+        
+        // Flatten results and update states
+        batchResults.flat().forEach(result => {
+            if (result && result.rawLine) {
+                serverStates[result.rawLine] = {
+                    alive: result.alive,
+                    latency: result.latency,
+                    method: result.method,
+                    lastChecked: new Date()
+                };
+            }
+        });
+
+        // Re-render display panes
+        renderDashboard();
+
+        // Setup next iteration
+        startCountdown();
+    }
+
+    // Countdown loop
+    function startCountdown() {
+        if (monitoringIntervalId) clearInterval(monitoringIntervalId);
+        if (countdownIntervalId) clearInterval(countdownIntervalId);
+
+        countdownSeconds = 30;
+        updateCountdownText();
+
+        countdownIntervalId = setInterval(() => {
+            countdownSeconds--;
+            updateCountdownText();
+            if (countdownSeconds <= 0) {
+                clearInterval(countdownIntervalId);
+                runPingCycle();
+            }
+        }, 1000);
+    }
+
+    function updateCountdownText() {
+        countdownInfo.textContent = `⏱️ 다음 점검 주기까지: ${countdownSeconds}초 대기 중...`;
+    }
+
+    // Render cards under dual panes
+    function renderDashboard() {
+        successPaneBody.innerHTML = '';
+        failedPaneBody.innerHTML = '';
+
+        let successCount = 0;
+        let failedCount = 0;
+
+        Object.entries(serverStates).forEach(([rawLine, state]) => {
+            const timeStr = state.lastChecked ? state.lastChecked.toLocaleTimeString() : '확인중';
+            const latencyStr = state.latency !== null ? `${state.latency}ms` : 'Timeout';
+            
+            // Method translations for UX
+            let methodStr = '';
+            if (state.method === 'raw_socket') methodStr = ' [Raw]';
+            else if (state.method === 'system_ping') methodStr = ' [CLI]';
+            else if (state.method === 'tcp_port') methodStr = ' [TCP]';
+            else if (state.method === 'error') methodStr = ' [Err]';
+
+            const card = document.createElement('div');
+            card.className = `host-card ${state.alive ? 'success-card' : 'failed-card'}`;
+            card.innerHTML = `
+                <div class="host-info">
+                    <span class="host-ip">${rawLine}</span>
+                    <span class="host-meta">마지막 검사: ${timeStr}${methodStr}</span>
+                </div>
+                <div class="host-status ${state.alive ? 'host-success-status' : 'host-failed-status'}">
+                    ${latencyStr}
+                </div>
+            `;
+
+            if (state.alive === true) {
+                successPaneBody.appendChild(card);
+                successCount++;
+            } else if (state.alive === false) {
+                failedPaneBody.appendChild(card);
+                failedCount++;
+            } else {
+                // Pending check
+                const pendingCard = document.createElement('div');
+                pendingCard.className = 'host-card';
+                pendingCard.style.borderLeft = '4px solid var(--text-secondary)';
+                pendingCard.innerHTML = `
+                    <div class="host-info">
+                        <span class="host-ip">${rawLine}</span>
+                        <span class="host-meta">대기 중...</span>
+                    </div>
+                    <div class="host-status" style="color: var(--text-secondary)">-</div>
+                `;
+                failedPaneBody.appendChild(pendingCard);
+                failedCount++;
+            }
+        });
+
+        // If lists are empty, show placeholders
+        if (successCount === 0) {
+            successPaneBody.innerHTML = `
+                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
+                    연결이 확인된 서버가 없습니다.
+                </div>`;
+        }
+        if (failedCount === 0) {
+            failedPaneBody.innerHTML = `
+                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
+                    연결에 장애가 있는 서버가 없습니다. 🎉
+                </div>`;
+        }
+
+        // Update counts
+        const total = Object.keys(serverStates).length;
+        totalCountEl.textContent = total;
+        successCountEl.textContent = successCount;
+        failedCountEl.textContent = failedCount;
+
+        paneSuccessCountEl.textContent = successCount;
+        paneFailedCountEl.textContent = failedCount;
+    }
+</script>
+
+</body>
+</html>
