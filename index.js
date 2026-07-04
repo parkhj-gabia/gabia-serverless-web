@@ -245,11 +245,18 @@ app.post('/api/worker-status-proxy', authenticateUser, async (req, res) => {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
     
-    const targetUrl = `http://${worker_ip}:${worker_port}/status`;
+    const protocol = (worker_port === '443' || worker_port === 443) ? 'https' : 'http';
+    const isStandardPort = (protocol === 'https' && (worker_port === '443' || worker_port === 443)) ||
+                           (protocol === 'http' && (worker_port === '80' || worker_port === 80));
+    const targetUrl = isStandardPort ? `${protocol}://${worker_ip}/status` : `${protocol}://${worker_ip}:${worker_port}/status`;
     try {
-        const response = await axios.get(targetUrl, { timeout: 4000 });
+        const response = await axios.get(targetUrl, { 
+            headers: { 'Bypass-Tunnel-Reminder': 'true' },
+            timeout: 4000 
+        });
         res.json(response.data);
     } catch (err) {
+        console.error(`[worker-status-proxy ERROR] Target: ${targetUrl}, Message: ${err.message}`, err.stack);
         res.status(500).json({ error: `Proxy failed to connect to worker: ${err.message}` });
     }
 });
@@ -261,11 +268,18 @@ app.post('/api/worker-ping-proxy', authenticateUser, async (req, res) => {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
     
-    const targetUrl = `http://${worker_ip}:${worker_port}/ping`;
+    const protocol = (worker_port === '443' || worker_port === 443) ? 'https' : 'http';
+    const isStandardPort = (protocol === 'https' && (worker_port === '443' || worker_port === 443)) ||
+                           (protocol === 'http' && (worker_port === '80' || worker_port === 80));
+    const targetUrl = isStandardPort ? `${protocol}://${worker_ip}/ping` : `${protocol}://${worker_ip}:${worker_port}/ping`;
     try {
-        const response = await axios.post(targetUrl, { server_ips }, { timeout: 12000 });
+        const response = await axios.post(targetUrl, { server_ips }, { 
+            headers: { 'Bypass-Tunnel-Reminder': 'true' },
+            timeout: 20000 
+        });
         res.json(response.data);
     } catch (err) {
+        console.error(`[worker-ping-proxy ERROR] Target: ${targetUrl}, Message: ${err.message}`, err.stack);
         res.status(500).json({ error: `Proxy failed to connect to worker: ${err.message}` });
     }
 });

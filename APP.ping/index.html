@@ -405,33 +405,228 @@
             color: var(--text-secondary);
             margin-top: 8px;
         }
+
+        /* Dynamic Tab Bar */
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background-color: var(--surface-hover);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border-color: var(--primary-color);
+            font-weight: 600;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Help icon and bubble tooltip */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: var(--text-secondary);
+            color: var(--surface-color);
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            margin-left: 4px;
+        }
+
+        .help-bubble {
+            visibility: hidden;
+            width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s, visibility 0.2s;
+            font-size: 0.75rem;
+            font-weight: normal;
+            line-height: 1.4;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            white-space: normal;
+        }
+
+        .help-bubble::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .help-icon:hover .help-bubble {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
 
+
+
 <div class="ping-container">
     <!-- 1. Connection Configurations -->
     <div class="card">
-        <div class="card-header">
-            <div class="card-title">📡 워커(Worker) 서버 설정</div>
-            <div id="workerStatusBadge" class="status-badge status-idle">연결 대기중</div>
+        <div class="card-header" style="margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div class="card-title" style="margin-bottom: 0;">📡 워커(Worker) 서버 설정</div>
+                <a href="./worker_installer.zip" download class="btn btn-secondary btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">📦 워커 패키지 다운로드 (.zip)</a>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="startMonitoringBtn" class="btn btn-primary">⚡ 모니터링 시작</button>
+                <button id="resetMonitoringBtn" class="btn btn-secondary">🔄 초기화</button>
+                <button id="stopMonitoringBtn" class="btn btn-danger" style="display: none;">🛑 모니터링 중지</button>
+            </div>
         </div>
-        <div class="settings-grid">
+        
+        <!-- Workers List Table -->
+        <div style="overflow-x: auto; margin-bottom: 16px; max-height: 250px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; color: var(--text-primary);">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600;">
+                        <th style="padding: 8px 10px;">워커 이름</th>
+                        <th style="padding: 8px 10px;">IP 주소</th>
+                        <th style="padding: 8px 10px; text-align: center;">포트</th>
+                        <th style="padding: 8px 10px; text-align: center;">상태</th>
+                        <th style="padding: 8px 10px; text-align: right;">작업</th>
+                    </tr>
+                </thead>
+                <tbody id="workersListTableBody">
+                    <!-- Dynamic workers rendered here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Worker Form -->
+        <div id="addWorkerForm" class="settings-grid" style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
             <div class="form-group">
-                <label for="workerIp">워커 서버 IP</label>
-                <input type="text" id="workerIp" class="form-control" value="127.0.0.1" placeholder="예: 127.0.0.1">
+                <label for="newWorkerName">워커 이름</label>
+                <input type="text" id="newWorkerName" class="form-control" placeholder="예: GCP 서울">
             </div>
             <div class="form-group">
-                <label for="workerPort">포트 (Port)</label>
-                <input type="text" id="workerPort" class="form-control" value="5000" placeholder="예: 5000">
+                <label for="newWorkerIp">IP 주소</label>
+                <input type="text" id="newWorkerIp" class="form-control" placeholder="예: 136.113.127.133">
+            </div>
+            <div class="form-group">
+                <label for="newWorkerPort" style="display: inline-flex; align-items: center;">
+                    포트 (Port)
+                    <span class="help-icon">?
+                        <span class="help-bubble">
+                            💡 <b>포트 설정 안내</b><br>
+                            - <b>기본 워커</b>는 포트가 <b>5000</b>입니다.<br>
+                            - <b>loca.lt (localtunnel)</b> 서버는 항상 <b>443</b>을 사용합니다.
+                        </span>
+                    </span>
+                </label>
+                <input type="text" id="newWorkerPort" class="form-control" value="5000" placeholder="예: 5000">
             </div>
             <div style="display: flex; gap: 8px; align-self: flex-end; margin-top: 6px;">
-                <button id="testConnectionBtn" class="btn btn-secondary">연결 테스트</button>
+                <button id="addWorkerBtn" class="btn btn-secondary">➕ 워커 추가</button>
             </div>
         </div>
     </div>
 
-    <!-- 2. Target Server Input Panel (Collapsible) -->
+    <!-- 2. Group Statistics summary Table -->
+    <div class="card" style="padding: 16px;">
+        <div class="card-header" style="margin-bottom: 12px;">
+            <div class="card-title">📊 그룹별 점검 현황 (Group Summary)</div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="groupStatsTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; color: var(--text-primary);">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600;">
+                        <th style="padding: 10px 12px;">그룹 이름</th>
+                        <th style="padding: 10px 12px; text-align: center;">전체 대상 수</th>
+                        <th style="padding: 10px 12px; text-align: center; color: var(--success-color);">정상 (Ping OK)</th>
+                        <th style="padding: 10px 12px; text-align: center; color: var(--danger-color);">장애 (Ping Fail)</th>
+                    </tr>
+                </thead>
+                <tbody id="groupStatsTableBody">
+                    <tr>
+                        <td colspan="4" style="padding: 16px; text-align: center; color: var(--text-secondary);">대기 중...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="countdownInfo" class="countdown-info" style="display: none;"></div>
+
+    <!-- 3. Integrated Monitoring Dashboard (Single Pane Table) -->
+    <div class="card" style="padding: 16px;">
+        <div class="card-header" style="margin-bottom: 12px;">
+            <div class="card-title">🖥️ 통합 모니터링 대시보드 (Integrated Dashboard)</div>
+            <div style="display: flex; gap: 8px;">
+                <button id="copyAllListBtn" class="btn btn-secondary btn-sm">전체 IP 복사 📋</button>
+                <button id="copySuccessListBtn" class="btn btn-success btn-sm">성공 IP 복사 ✅</button>
+                <button id="copyFailedListBtn" class="btn btn-danger btn-sm">장애 IP 복사 🚨</button>
+            </div>
+        </div>
+
+        <!-- Group Tabs Bar -->
+        <div id="tabsContainer" class="tabs-container" style="display: none;">
+            <!-- Dynamic tab buttons rendered via JS -->
+        </div>
+
+        <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
+            <table id="monitoringDashboardTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background-color: var(--surface-color); z-index: 1;">
+                        <th style="padding: 12px;">IP 주소</th>
+                        <th style="padding: 12px;">그룹</th>
+                        <th style="padding: 12px; text-align: center; color: var(--success-color);">성공 횟수</th>
+                        <th style="padding: 12px; text-align: center; color: var(--danger-color);">실패 횟수</th>
+                        <th style="padding: 12px; text-align: right;">마지막 결과 (Latency)</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboardTableBody">
+                    <tr>
+                        <td colspan="5" style="padding: 30px; text-align: center; color: var(--text-secondary);">대기 중...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Target Server Input Panel (Collapsible) -->
     <div class="card">
         <div class="card-header">
             <div class="card-title">📝 점검 대상 IP 리스트</div>
@@ -446,68 +641,9 @@
 
         <div id="textareaContainer" class="textarea-container">
             <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 10px;">
-                줄바꿈(Enter) 또는 쉼표(,) 등으로 구분하여 감시 대상 IP/도메인을 입력해 주세요.
+                줄바꿈(Enter) 또는 쉼표(,) 등으로 구분하여 감시 대상 IP/도메인을 입력해 주세요. (예: `1.1.1.1 (그룹이름)`)
             </p>
-            <textarea id="targetListInput" class="form-control" rows="8" style="width: 100%; font-family: monospace; resize: vertical;" placeholder="1.1.1.1&#10;8.8.8.8&#10;example.com"></textarea>
-            <div style="display: flex; gap: 12px; margin-top: 16px; justify-content: flex-end;">
-                <button id="startMonitoringBtn" class="btn btn-primary">⚡ 모니터링 시작</button>
-                <button id="stopMonitoringBtn" class="btn btn-danger" style="display: none;">🛑 모니터링 중지</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. Real-time Status Counts -->
-    <div class="stats-panel">
-        <div class="stat-card">
-            <div class="stat-label">전체 대상 수</div>
-            <div id="totalCount" class="stat-value stat-total">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">정상 (Ping OK)</div>
-            <div id="successCount" class="stat-value stat-success">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">장애 (Ping Fail)</div>
-            <div id="failedCount" class="stat-value stat-failed">0</div>
-        </div>
-    </div>
-
-    <div id="countdownInfo" class="countdown-info" style="display: none;"></div>
-
-    <!-- 4. Dual Panes (Success vs Failed) -->
-    <div class="dashboard-grid">
-        <!-- Success Pane -->
-        <div class="pane">
-            <div class="pane-header pane-success-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>정상 리스트 (Success)</span>
-                    <button id="copySuccessBtn" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); font-weight: normal; margin-top: 1px;">복사 📋</button>
-                </div>
-                <span id="paneSuccessCount">0</span>
-            </div>
-            <div id="successPaneBody" class="pane-body">
-                <!-- Dynamic cards injected here -->
-                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
-                    대기중...
-                </div>
-            </div>
-        </div>
-
-        <!-- Failed Pane -->
-        <div class="pane">
-            <div class="pane-header pane-failed-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>장애 리스트 (Failed)</span>
-                    <button id="copyFailedBtn" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); font-weight: normal; margin-top: 1px;">복사 📋</button>
-                </div>
-                <span id="paneFailedCount">0</span>
-            </div>
-            <div id="failedPaneBody" class="pane-body">
-                <!-- Dynamic cards injected here -->
-                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
-                    대기중...
-                </div>
-            </div>
+            <textarea id="targetListInput" class="form-control" rows="8" style="width: 100%; font-family: monospace; resize: vertical;" placeholder="1.1.1.1 (WG183)&#10;8.8.8.8 (DNS)&#10;example.com (Web)"></textarea>
         </div>
     </div>
 </div>
@@ -517,16 +653,13 @@
     let isMonitoring = false;
     let monitoringIntervalId = null;
     let countdownIntervalId = null;
-    let serverStates = {}; // key: IP/Host, value: { alive: bool, latency: float, method: str, lastChecked: Date }
-    let serverList = []; // Array of clean IPs
+    let serverStates = {}; // key: rawLine, value: { workers: { workerId: { alive, latency, method, error, successCount, failureCount, lastChecked } } }
+    let serverList = []; // Array of raw input lines
     let countdownSeconds = 30;
+    let activeGroupTab = 'All'; // Selected group filter tab ('All' or groupName)
+    let workers = []; // Array of { id, name, ip, port, status }
 
     // DOM Elements
-    const workerIpInput = document.getElementById('workerIp');
-    const workerPortInput = document.getElementById('workerPort');
-    const testConnectionBtn = document.getElementById('testConnectionBtn');
-    const workerStatusBadge = document.getElementById('workerStatusBadge');
-
     const targetListInput = document.getElementById('targetListInput');
     const textareaContainer = document.getElementById('textareaContainer');
     const toggleInputBtn = document.getElementById('toggleInputBtn');
@@ -534,20 +667,20 @@
     const collapsedCount = document.getElementById('collapsedCount');
     
     const startMonitoringBtn = document.getElementById('startMonitoringBtn');
+    const resetMonitoringBtn = document.getElementById('resetMonitoringBtn');
     const stopMonitoringBtn = document.getElementById('stopMonitoringBtn');
-
-    const totalCountEl = document.getElementById('totalCount');
-    const successCountEl = document.getElementById('successCount');
-    const failedCountEl = document.getElementById('failedCount');
-    const paneSuccessCountEl = document.getElementById('paneSuccessCount');
-    const paneFailedCountEl = document.getElementById('paneFailedCount');
-    
-    const successPaneBody = document.getElementById('successPaneBody');
-    const failedPaneBody = document.getElementById('failedPaneBody');
     const countdownInfo = document.getElementById('countdownInfo');
 
-    const copySuccessBtn = document.getElementById('copySuccessBtn');
-    const copyFailedBtn = document.getElementById('copyFailedBtn');
+    const copyAllListBtn = document.getElementById('copyAllListBtn');
+    const copySuccessListBtn = document.getElementById('copySuccessListBtn');
+    const copyFailedListBtn = document.getElementById('copyFailedListBtn');
+    const tabsContainer = document.getElementById('tabsContainer');
+    const workersListTableBody = document.getElementById('workersListTableBody');
+    
+    const newWorkerNameInput = document.getElementById('newWorkerName');
+    const newWorkerIpInput = document.getElementById('newWorkerIp');
+    const newWorkerPortInput = document.getElementById('newWorkerPort');
+    const addWorkerBtn = document.getElementById('addWorkerBtn');
 
     // Clipboard copy helper
     async function copyToClipboard(text) {
@@ -574,142 +707,292 @@
         }
     }
 
-    // Copy Event Listeners
-    copySuccessBtn.addEventListener('click', async () => {
-        const successIps = Object.entries(serverStates)
-            .filter(([_, state]) => state.alive === true)
-            .map(([rawLine, _]) => rawLine)
-            .join('\n');
-            
-        if (!successIps) {
-            alert('복사할 정상 상태의 IP가 없습니다.');
-            return;
-        }
-        
-        const success = await copyToClipboard(successIps);
-        if (success) {
-            const originalText = copySuccessBtn.innerText;
-            copySuccessBtn.innerText = '복사됨 ✅';
-            setTimeout(() => copySuccessBtn.innerText = originalText, 1500);
-        }
-    });
-
-    copyFailedBtn.addEventListener('click', async () => {
-        const failedIps = Object.entries(serverStates)
-            .filter(([_, state]) => state.alive === false || state.alive === null)
-            .map(([rawLine, _]) => rawLine)
-            .join('\n');
-            
-        if (!failedIps) {
-            alert('복사할 장애 상태의 IP가 없습니다.');
-            return;
-        }
-        
-        const success = await copyToClipboard(failedIps);
-        if (success) {
-            const originalText = copyFailedBtn.innerText;
-            copyFailedBtn.innerText = '복사됨 ✅';
-            setTimeout(() => copyFailedBtn.innerText = originalText, 1500);
-        }
-    });
-
-    // Initialize from LocalStorage or server default
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedIp = localStorage.getItem('ping_worker_ip');
-        const savedPort = localStorage.getItem('ping_worker_port');
-        const savedList = localStorage.getItem('ping_target_list');
-
-        if (savedList) targetListInput.value = savedList;
-
-        if (savedIp && savedPort) {
-            workerIpInput.value = savedIp;
-            workerPortInput.value = savedPort;
-            testWorkerConnection();
-        } else {
-            // No local storage config, fetch default from Google Cloud env vars via Express API
-            const parentAuthToken = window.parent.authToken || '';
-            fetch('../api/worker-config', {
-                headers: {
-                    'Authorization': `Bearer ${parentAuthToken}`
-                }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.workerUrl) {
-                    try {
-                        const url = new URL(data.workerUrl);
-                        workerIpInput.value = url.hostname;
-                        workerPortInput.value = url.port || '80';
-                    } catch (e) {
-                        console.error('Failed to parse workerUrl:', e);
-                        workerIpInput.value = '127.0.0.1';
-                        workerPortInput.value = '5000';
-                    }
-                } else {
-                    workerIpInput.value = '127.0.0.1';
-                    workerPortInput.value = '5000';
-                }
-                testWorkerConnection();
-            })
-            .catch(err => {
-                console.error('Failed to fetch default worker config:', err);
-                workerIpInput.value = '127.0.0.1';
-                workerPortInput.value = '5000';
-                testWorkerConnection();
-            });
-        }
-    });
-
     // Save configurations
     function saveConfigs() {
-        localStorage.setItem('ping_worker_ip', workerIpInput.value.trim());
-        localStorage.setItem('ping_worker_port', workerPortInput.value.trim());
         localStorage.setItem('ping_target_list', targetListInput.value);
     }
 
-    // Test Worker Connection
-    async function testWorkerConnection() {
-        const ip = workerIpInput.value.trim();
-        const port = workerPortInput.value.trim();
+    function saveWorkers() {
+        localStorage.setItem('ping_workers', JSON.stringify(workers));
+    }
+
+    // Render Workers List in UI
+    function renderWorkers() {
+        workersListTableBody.innerHTML = '';
+        if (workers.length === 0) {
+            workersListTableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="padding: 12px; text-align: center; color: var(--text-secondary);">등록된 워커 서버가 없습니다. 우측 하단에서 추가해 주세요.</td>
+                </tr>
+            `;
+            return;
+        }
+
+        workers.forEach(w => {
+            let badgeClass = 'status-badge status-idle';
+            let badgeText = '대기중';
+
+            if (w.status === 'testing') {
+                badgeClass = 'status-badge status-idle';
+                badgeText = '확인 중...';
+            } else if (w.status === 'online') {
+                badgeClass = 'status-badge status-online';
+                badgeText = '온라인';
+            } else if (w.status === 'offline') {
+                badgeClass = 'status-badge status-offline';
+                badgeText = '오프라인';
+            }
+
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border-color)';
+            tr.innerHTML = `
+                <td style="padding: 8px 10px; font-weight: 500;">${w.name}</td>
+                <td style="padding: 8px 10px; font-family: monospace;">${w.ip}</td>
+                <td style="padding: 8px 10px; text-align: center; font-family: monospace;">${w.port}</td>
+                <td style="padding: 8px 10px; text-align: center;"><span class="${badgeClass}">${badgeText}</span></td>
+                <td style="padding: 8px 10px; text-align: right;">
+                    <button class="btn btn-secondary btn-sm" onclick="testWorkerConnection('${w.id}')" style="padding: 2px 8px; font-size: 0.75rem; margin-right: 4px;" ${isMonitoring ? 'disabled' : ''}>테스트</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteWorker('${w.id}')" style="padding: 2px 8px; font-size: 0.75rem;" ${isMonitoring ? 'disabled' : ''}>삭제</button>
+                </td>
+            `;
+            workersListTableBody.appendChild(tr);
+        });
+    }
+
+    // Expose helpers globally so HTML onclick handlers can find them
+    window.testWorkerConnection = testWorkerConnection;
+    window.deleteWorker = deleteWorker;
+
+    // Test individual worker connection
+    async function testWorkerConnection(workerId) {
+        const workerIndex = workers.findIndex(w => w.id === workerId);
+        if (workerIndex === -1) return false;
+
+        const worker = workers[workerIndex];
+        worker.status = 'testing';
+        renderWorkers();
+
         const parentAuthToken = window.parent.authToken || '';
-
-        workerStatusBadge.className = 'status-badge status-idle';
-        workerStatusBadge.textContent = '확인 중...';
-
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
 
-            // Fetch via backend status proxy to avoid HTTPS Mixed Content block
             const res = await fetch('../api/worker-status-proxy', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${parentAuthToken}`
                 },
-                body: JSON.stringify({ worker_ip: ip, worker_port: port }),
+                body: JSON.stringify({ worker_ip: worker.ip, worker_port: worker.port }),
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
 
             if (res.ok) {
-                const data = await res.json();
-                const privilegeStr = data.has_raw_privilege ? '(Raw)' : '(Fallback)';
-                workerStatusBadge.className = 'status-badge status-online';
-                workerStatusBadge.textContent = `온라인 ${privilegeStr}`;
-                saveConfigs();
+                worker.status = 'online';
+                saveWorkers();
+                renderWorkers();
                 return true;
             }
         } catch (e) {
-            console.error(e);
+            console.error(`Status check failed for ${worker.name}:`, e);
         }
 
-        workerStatusBadge.className = 'status-badge status-offline';
-        workerStatusBadge.textContent = '오프라인 (연결 실패)';
+        worker.status = 'offline';
+        saveWorkers();
+        renderWorkers();
         return false;
     }
 
-    testConnectionBtn.addEventListener('click', testWorkerConnection);
+    // Delete worker from list
+    function deleteWorker(workerId) {
+        if (isMonitoring) return;
+        workers = workers.filter(w => w.id !== workerId);
+        saveWorkers();
+        renderWorkers();
+    }
+
+    // Add new worker
+    addWorkerBtn.addEventListener('click', () => {
+        if (isMonitoring) return;
+        const name = newWorkerNameInput.value.trim();
+        const ip = newWorkerIpInput.value.trim();
+        const port = newWorkerPortInput.value.trim() || '5000';
+
+        if (!name || !ip) {
+            alert('워커 이름과 IP 주소를 모두 입력해 주세요.');
+            return;
+        }
+
+        const newWorker = {
+            id: 'w_' + Date.now().toString(),
+            name: name,
+            ip: ip,
+            port: port,
+            status: 'idle'
+        };
+
+        workers.push(newWorker);
+        saveWorkers();
+        renderWorkers();
+
+        // Clear input values
+        newWorkerNameInput.value = '';
+        newWorkerIpInput.value = '';
+        newWorkerPortInput.value = '5000';
+
+        // Auto-run connection test for newly added worker
+        testWorkerConnection(newWorker.id);
+    });
+
+    // Test connection to all workers
+    async function testAllWorkers() {
+        const promises = workers.map(w => testWorkerConnection(w.id));
+        await Promise.all(promises);
+        return workers.some(w => w.status === 'online');
+    }
+
+    // Initialize from LocalStorage or fetch default worker config
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedList = localStorage.getItem('ping_target_list');
+        if (savedList) targetListInput.value = savedList;
+
+        const savedWorkersStr = localStorage.getItem('ping_workers');
+        if (savedWorkersStr) {
+            try {
+                workers = JSON.parse(savedWorkersStr);
+                // Reset testing/monitored state back to idle on load
+                workers.forEach(w => w.status = 'idle');
+                renderWorkers();
+                testAllWorkers();
+            } catch (e) {
+                console.error('Failed to parse saved workers:', e);
+                loadDefaultWorker();
+            }
+        } else {
+            loadDefaultWorker();
+        }
+
+    });
+
+    function loadDefaultWorker() {
+        const parentAuthToken = window.parent.authToken || '';
+        fetch('../api/worker-config', {
+            headers: {
+                'Authorization': `Bearer ${parentAuthToken}`
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.workerUrl) {
+                try {
+                    const url = new URL(data.workerUrl);
+                    workers = [{
+                        id: 'w_default',
+                        name: '기본 워커',
+                        ip: url.hostname,
+                        port: url.port || '80',
+                        status: 'idle'
+                    }];
+                } catch (e) {
+                    console.error('Failed to parse default worker config:', e);
+                    workers = [{ id: 'w_default', name: '기본 워커', ip: '136.113.127.133', port: '5000', status: 'idle' }];
+                }
+            } else {
+                workers = [{ id: 'w_default', name: '기본 워커', ip: '136.113.127.133', port: '5000', status: 'idle' }];
+            }
+            saveWorkers();
+            renderWorkers();
+            testAllWorkers();
+        })
+        .catch(err => {
+            console.error('Failed to fetch default worker config:', err);
+            workers = [{ id: 'w_default', name: '기본 워커', ip: '136.113.127.133', port: '5000', status: 'idle' }];
+            saveWorkers();
+            renderWorkers();
+            testAllWorkers();
+        });
+    }
+
+    // Copy Event Listeners
+    copyAllListBtn.addEventListener('click', async () => {
+        const allIps = Object.keys(serverStates)
+            .filter(rawLine => activeGroupTab === 'All' || extractGroup(rawLine) === activeGroupTab)
+            .map(rawLine => extractIp(rawLine))
+            .join('\n');
+            
+        if (!allIps) {
+            alert('복사할 IP가 없습니다.');
+            return;
+        }
+        
+        const success = await copyToClipboard(allIps);
+        if (success) {
+            const originalText = copyAllListBtn.innerText;
+            copyAllListBtn.innerText = '복사됨 ✅';
+            setTimeout(() => copyAllListBtn.innerText = originalText, 1500);
+        }
+    });
+
+    copySuccessListBtn.addEventListener('click', async () => {
+        const activeWorkers = workers.filter(w => w.status === 'online');
+        if (activeWorkers.length === 0) {
+            alert('활성화된 온라인 워커가 없습니다.');
+            return;
+        }
+
+        const successIps = Object.entries(serverStates)
+            .filter(([rawLine, state]) => {
+                const matchesGroup = activeGroupTab === 'All' || extractGroup(rawLine) === activeGroupTab;
+                if (!matchesGroup) return false;
+                // Copy if it succeeded on AT LEAST ONE active worker
+                return activeWorkers.some(w => state.workers[w.id] && state.workers[w.id].alive === true);
+            })
+            .map(([rawLine, _]) => extractIp(rawLine))
+            .join('\n');
+            
+        if (!successIps) {
+            alert('한번이라도 성공한 IP가 없습니다.');
+            return;
+        }
+        
+        const success = await copyToClipboard(successIps);
+        if (success) {
+            const originalText = copySuccessListBtn.innerText;
+            copySuccessListBtn.innerText = '복사됨 ✅';
+            setTimeout(() => copySuccessListBtn.innerText = originalText, 1500);
+        }
+    });
+
+    copyFailedListBtn.addEventListener('click', async () => {
+        const activeWorkers = workers.filter(w => w.status === 'online');
+        if (activeWorkers.length === 0) {
+            alert('활성화된 온라인 워커가 없습니다.');
+            return;
+        }
+
+        const failedIps = Object.entries(serverStates)
+            .filter(([rawLine, state]) => {
+                const matchesGroup = activeGroupTab === 'All' || extractGroup(rawLine) === activeGroupTab;
+                if (!matchesGroup) return false;
+                // Copy if it failed on ALL active workers (never succeeded)
+                return activeWorkers.every(w => state.workers[w.id] && state.workers[w.id].alive === false);
+            })
+            .map(([rawLine, _]) => extractIp(rawLine))
+            .join('\n');
+            
+        if (!failedIps) {
+            alert('한번도 성공한 적이 없는 IP가 없습니다.');
+            return;
+        }
+        
+        const success = await copyToClipboard(failedIps);
+        if (success) {
+            const originalText = copyFailedListBtn.innerText;
+            copyFailedListBtn.innerText = '복사됨 ✅';
+            setTimeout(() => copyFailedListBtn.innerText = originalText, 1500);
+        }
+    });
 
     // Collapsible Logic
     function setInputCollapsed(shouldCollapse) {
@@ -718,7 +1001,6 @@
             collapsedSummary.style.display = 'flex';
             toggleInputBtn.style.display = 'none';
             
-            // Clean and count list
             const cleanList = parseInputList();
             collapsedCount.textContent = cleanList.length;
         } else {
@@ -738,10 +1020,15 @@
         return match ? match[1] : line;
     }
 
+    // Extract Group name from parentheses (default: '기타')
+    function extractGroup(line) {
+        const match = line.match(/\(([^)]+)\)/);
+        return match ? match[1].trim() : '기타';
+    }
+
     // Parse input IPs list
     function parseInputList() {
         const text = targetListInput.value;
-        // Split strictly by newlines to preserve comments on the same line
         return text.split(/\r?\n/)
             .map(item => item.trim())
             .filter(item => item.length > 0);
@@ -749,10 +1036,14 @@
 
     // Monitoring Trigger Start/Stop
     startMonitoringBtn.addEventListener('click', async () => {
-        // Validate worker connection first
-        const isOnline = await testWorkerConnection();
-        if (!isOnline) {
-            alert('워커 서버에 연결할 수 없습니다. IP/Port 설정을 확인하고 워커 실행 명령을 실행하세요.');
+        if (workers.length === 0) {
+            alert('최소 1개 이상의 워커 서버를 설정해 주세요.');
+            return;
+        }
+
+        const anyOnline = await testAllWorkers();
+        if (!anyOnline) {
+            alert('연결 가능한 온라인 워커가 없습니다. IP/Port 설정을 확인하고 워커 서버를 기동하세요.');
             return;
         }
 
@@ -762,16 +1053,28 @@
             return;
         }
 
+        const activeWorkers = workers.filter(w => w.status === 'online');
+
         // Initialize state mapping
         serverList.forEach(rawLine => {
             if (!serverStates[rawLine]) {
                 serverStates[rawLine] = {
-                    alive: null,
-                    latency: null,
-                    method: '',
-                    lastChecked: null
+                    workers: {}
                 };
             }
+            activeWorkers.forEach(w => {
+                if (!serverStates[rawLine].workers[w.id]) {
+                    serverStates[rawLine].workers[w.id] = {
+                        alive: null,
+                        latency: null,
+                        method: '',
+                        error: null,
+                        successCount: 0,
+                        failureCount: 0,
+                        lastChecked: null
+                    };
+                }
+            });
         });
 
         // Clean obsolete IPs from state if they were deleted from input
@@ -785,11 +1088,15 @@
         saveConfigs();
         setInputCollapsed(true);
 
+        activeGroupTab = 'All';
+        renderTabs();
+        renderWorkers();
+
         startMonitoringBtn.style.display = 'none';
+        resetMonitoringBtn.style.display = 'none';
         stopMonitoringBtn.style.display = 'inline-flex';
         countdownInfo.style.display = 'block';
 
-        // Run immediately, then start interval
         runPingCycle();
     });
 
@@ -801,34 +1108,63 @@
         if (countdownIntervalId) clearInterval(countdownIntervalId);
 
         startMonitoringBtn.style.display = 'inline-flex';
+        resetMonitoringBtn.style.display = 'inline-flex';
         stopMonitoringBtn.style.display = 'none';
         countdownInfo.style.display = 'none';
+        tabsContainer.style.display = 'none';
         
         setInputCollapsed(false);
-        workerStatusBadge.className = 'status-badge status-idle';
-        workerStatusBadge.textContent = '연결 대기중';
+        testAllWorkers();
     }
 
-    // Batching & Dispatch Ping calls
-    async function runPingCycle() {
-        if (!isMonitoring) return;
-
-        countdownInfo.textContent = '🔍 핑 분석 진행중...';
+    resetMonitoringBtn.addEventListener('click', () => {
+        if (isMonitoring) return;
         
-        const ip = workerIpInput.value.trim();
-        const port = workerPortInput.value.trim();
-        const parentAuthToken = window.parent.authToken || '';
+        // Reset all monitoring values
+        serverStates = {};
+        
+        // Refresh tables to wait status
+        const activeWorkers = workers.filter(w => w.status === 'online');
+        const colSpan = 3 + activeWorkers.length;
+        dashboardTableBody.innerHTML = `
+            <tr>
+                <td colspan="${colSpan}" style="padding: 30px; text-align: center; color: var(--text-secondary);">모니터링이 초기화되었습니다. [모니터링 시작]을 눌러주세요.</td>
+            </tr>
+        `;
+        
+        const groupStatsTable = document.getElementById('groupStatsTable');
+        const groupColSpan = 3 + activeWorkers.length;
+        groupStatsTable.innerHTML = `
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600;">
+                    <th style="padding: 10px 12px;">그룹 이름</th>
+                    <th style="padding: 10px 12px; text-align: center;">전체 대상 수</th>
+                    <th style="padding: 10px 12px; text-align: center; color: var(--primary-color); font-weight: 600;">전체 (정상/장애)</th>
+                    ${activeWorkers.map(w => `<th style="padding: 10px 12px; text-align: center; color: var(--text-primary); font-weight: 600;">${w.name} (정상/장애)</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="${groupColSpan}" style="padding: 16px; text-align: center; color: var(--text-secondary);">대기 중...</td>
+                </tr>
+            </tbody>
+        `;
+        
+        alert('모든 모니터링 수치가 성공적으로 초기화되었습니다.');
+    });
 
-        // Chunk size is 20
+    // Ping check execution for a single worker
+    async function runPingForWorker(worker) {
         const CHUNK_SIZE = 20;
         const batches = [];
         for (let i = 0; i < serverList.length; i += CHUNK_SIZE) {
             batches.push(serverList.slice(i, i + CHUNK_SIZE));
         }
 
-        // Concurrently run all batch API calls (Asynchronous batching)
-        const fetchPromises = batches.map(async (batch) => {
-            // Map extracted IP -> list of original raw lines
+        const CONCURRENCY_LIMIT = 5;
+        const results = [];
+
+        async function runWorkerBatch(batch) {
             const ipToRawMap = {};
             batch.forEach(rawLine => {
                 const cleanIp = extractIp(rawLine);
@@ -837,9 +1173,9 @@
             });
 
             const ipBatch = Object.keys(ipToRawMap);
+            const parentAuthToken = window.parent.authToken || '';
 
             try {
-                // Fetch via backend ping proxy to avoid HTTPS Mixed Content block
                 const res = await fetch('../api/worker-ping-proxy', {
                     method: 'POST',
                     headers: { 
@@ -847,8 +1183,8 @@
                         'Authorization': `Bearer ${parentAuthToken}`
                     },
                     body: JSON.stringify({ 
-                        worker_ip: ip, 
-                        worker_port: port, 
+                        worker_ip: worker.ip, 
+                        worker_port: worker.port, 
                         server_ips: ipBatch 
                     })
                 });
@@ -863,44 +1199,96 @@
                                 rawLine: rawLine,
                                 alive: r.alive,
                                 latency: r.latency,
-                                method: r.method
+                                method: r.method,
+                                error: r.error
                             });
                         });
                     });
                     return mappedResults;
+                } else {
+                    return batch.map(rawLine => ({
+                        rawLine: rawLine,
+                        alive: false,
+                        latency: null,
+                        method: 'error',
+                        error: 'timeout'
+                    }));
                 }
             } catch (err) {
-                console.error(`Batch ping failed for targets: ${batch.join(', ')}`, err);
-                // Return failed results mapping on connection error
+                console.error(`Batch ping failed for worker ${worker.name}:`, err);
                 return batch.map(rawLine => ({
                     rawLine: rawLine,
                     alive: false,
                     latency: null,
-                    method: 'error'
+                    method: 'error',
+                    error: 'timeout'
                 }));
             }
-            return [];
-        });
+        }
 
-        // Resolve all batches asynchronously
-        const batchResults = await Promise.all(fetchPromises);
+        const activePromises = [];
+        for (const batch of batches) {
+            if (activePromises.length >= CONCURRENCY_LIMIT) {
+                await Promise.race(activePromises);
+            }
+            const p = runWorkerBatch(batch).then(res => {
+                results.push(...res);
+                activePromises.splice(activePromises.indexOf(p), 1);
+            });
+            activePromises.push(p);
+        }
+        await Promise.all(activePromises);
         
-        // Flatten results and update states
-        batchResults.flat().forEach(result => {
+        results.forEach(result => {
             if (result && result.rawLine) {
-                serverStates[result.rawLine] = {
-                    alive: result.alive,
-                    latency: result.latency,
-                    method: result.method,
-                    lastChecked: new Date()
-                };
+                const state = serverStates[result.rawLine];
+                if (state) {
+                    if (!state.workers[worker.id]) {
+                        state.workers[worker.id] = {
+                            alive: null,
+                            latency: null,
+                            method: '',
+                            error: null,
+                            successCount: 0,
+                            failureCount: 0,
+                            lastChecked: null
+                        };
+                    }
+                    
+                    const ws = state.workers[worker.id];
+                    ws.alive = result.alive;
+                    ws.latency = result.latency;
+                    ws.method = result.method;
+                    ws.error = result.error;
+                    ws.lastChecked = new Date();
+                    
+                    if (result.alive === true) {
+                        ws.successCount = (ws.successCount || 0) + 1;
+                    } else if (result.alive === false) {
+                        ws.failureCount = (ws.failureCount || 0) + 1;
+                    }
+                }
             }
         });
+    }
 
-        // Re-render display panes
+    // Batching & Dispatch Ping calls for all active workers
+    async function runPingCycle() {
+        if (!isMonitoring) return;
+
+        const activeWorkers = workers.filter(w => w.status === 'online');
+        if (activeWorkers.length === 0) {
+            alert('모니터링 중인 모든 워커가 오프라인 상태입니다. 모니터링을 중지합니다.');
+            stopMonitoring();
+            return;
+        }
+
+        countdownInfo.textContent = '🔍 각 지점별 워커로부터 핑 분석 진행중...';
+
+        const workerPromises = activeWorkers.map(w => runPingForWorker(w));
+        await Promise.all(workerPromises);
+
         renderDashboard();
-
-        // Setup next iteration
         startCountdown();
     }
 
@@ -926,83 +1314,268 @@
         countdownInfo.textContent = `⏱️ 다음 점검 주기까지: ${countdownSeconds}초 대기 중...`;
     }
 
-    // Render cards under dual panes
+    // Render cards under single unified pane and group stats table
     function renderDashboard() {
-        successPaneBody.innerHTML = '';
-        failedPaneBody.innerHTML = '';
+        const groupStatsTable = document.getElementById('groupStatsTable');
+        const dashboardTableBody = document.getElementById('dashboardTableBody');
+        const monitoringDashboardTable = document.getElementById('monitoringDashboardTable');
+        
+        dashboardTableBody.innerHTML = '';
 
-        let successCount = 0;
-        let failedCount = 0;
+        const activeWorkers = workers.filter(w => w.status === 'online');
+        if (activeWorkers.length === 0) return;
 
+        let groupHeaderHtml = `
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600;">
+                    <th style="padding: 10px 12px;">그룹 이름</th>
+                    <th style="padding: 10px 12px; text-align: center;">전체 대상 수</th>
+                    <th style="padding: 10px 12px; text-align: center; color: var(--primary-color); font-weight: 600;">전체 (정상/장애)</th>
+        `;
+        activeWorkers.forEach(w => {
+            groupHeaderHtml += `<th style="padding: 10px 12px; text-align: center; color: var(--text-primary); font-weight: 600;">${w.name} (정상/장애)</th>`;
+        });
+        groupHeaderHtml += `</tr></thead>`;
+
+        const groupStats = {};
+        
         Object.entries(serverStates).forEach(([rawLine, state]) => {
-            const timeStr = state.lastChecked ? state.lastChecked.toLocaleTimeString() : '확인중';
-            const latencyStr = state.latency !== null ? `${state.latency}ms` : 'Timeout';
+            const groupName = extractGroup(rawLine);
+            if (!groupStats[groupName]) {
+                groupStats[groupName] = { total: 0, workers: {}, uniqueNormal: 0, uniqueFailed: 0 };
+                activeWorkers.forEach(w => {
+                    groupStats[groupName].workers[w.id] = { success: 0, failed: 0 };
+                });
+            }
+            groupStats[groupName].total++;
             
-            // Method translations for UX
-            let methodStr = '';
-            if (state.method === 'raw_socket') methodStr = ' [Raw]';
-            else if (state.method === 'system_ping') methodStr = ' [CLI]';
-            else if (state.method === 'tcp_port') methodStr = ' [TCP]';
-            else if (state.method === 'error') methodStr = ' [Err]';
+            // 1. Per-worker counts
+            activeWorkers.forEach(w => {
+                const ws = state.workers[w.id];
+                if (ws) {
+                    if (ws.alive === true) {
+                        groupStats[groupName].workers[w.id].success++;
+                    } else if (ws.alive === false) {
+                        groupStats[groupName].workers[w.id].failed++;
+                    }
+                }
+            });
 
-            const card = document.createElement('div');
-            card.className = `host-card ${state.alive ? 'success-card' : 'failed-card'}`;
-            card.innerHTML = `
-                <div class="host-info">
-                    <span class="host-ip">${rawLine}</span>
-                    <span class="host-meta">마지막 검사: ${timeStr}${methodStr}</span>
-                </div>
-                <div class="host-status ${state.alive ? 'host-success-status' : 'host-failed-status'}">
-                    ${latencyStr}
-                </div>
-            `;
-
-            if (state.alive === true) {
-                successPaneBody.appendChild(card);
-                successCount++;
-            } else if (state.alive === false) {
-                failedPaneBody.appendChild(card);
-                failedCount++;
-            } else {
-                // Pending check
-                const pendingCard = document.createElement('div');
-                pendingCard.className = 'host-card';
-                pendingCard.style.borderLeft = '4px solid var(--text-secondary)';
-                pendingCard.innerHTML = `
-                    <div class="host-info">
-                        <span class="host-ip">${rawLine}</span>
-                        <span class="host-meta">대기 중...</span>
-                    </div>
-                    <div class="host-status" style="color: var(--text-secondary)">-</div>
-                `;
-                failedPaneBody.appendChild(pendingCard);
-                failedCount++;
+            // 2. Unique normal / failed across all active workers
+            const checkedWorkers = activeWorkers.filter(w => state.workers[w.id] && state.workers[w.id].alive !== null);
+            if (checkedWorkers.length > 0) {
+                const hasSuccess = checkedWorkers.some(w => state.workers[w.id].alive === true);
+                const allFailed = checkedWorkers.every(w => state.workers[w.id].alive === false);
+                if (hasSuccess) {
+                    groupStats[groupName].uniqueNormal++;
+                } else if (allFailed) {
+                    groupStats[groupName].uniqueFailed++;
+                }
             }
         });
 
-        // If lists are empty, show placeholders
-        if (successCount === 0) {
-            successPaneBody.innerHTML = `
-                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
-                    연결이 확인된 서버가 없습니다.
-                </div>`;
+        const groups = Object.keys(groupStats).sort();
+        let groupBodyHtml = `<tbody>`;
+        if (groups.length === 0) {
+            groupBodyHtml += `
+                <tr>
+                    <td colspan="${3 + activeWorkers.length}" style="padding: 16px; text-align: center; color: var(--text-secondary);">대기 중...</td>
+                </tr>
+            `;
+        } else {
+            groups.forEach(groupName => {
+                const stats = groupStats[groupName];
+                let rowHtml = `
+                    <td style="padding: 10px 12px; font-weight: 500;">${groupName}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 600;">${stats.total}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 600;">
+                        <span style="color: var(--success-color);">${stats.uniqueNormal}</span> / 
+                        <span style="color: var(--danger-color);">${stats.uniqueFailed}</span>
+                    </td>
+                `;
+                
+                activeWorkers.forEach(w => {
+                    const wsStats = stats.workers[w.id] || { success: 0, failed: 0 };
+                    rowHtml += `
+                        <td style="padding: 10px 12px; text-align: center; font-weight: 600;">
+                            <span style="color: var(--success-color);">${wsStats.success}</span> / 
+                            <span style="color: var(--danger-color);">${wsStats.failed}</span>
+                        </td>
+                    `;
+                });
+                groupBodyHtml += `<tr style="border-bottom: 1px solid var(--border-color);">${rowHtml}</tr>`;
+            });
         }
-        if (failedCount === 0) {
-            failedPaneBody.innerHTML = `
-                <div style="color: var(--text-secondary); text-align: center; margin-top: 100px; font-size: 0.9rem;">
-                    연결에 장애가 있는 서버가 없습니다. 🎉
-                </div>`;
+        groupBodyHtml += `</tbody>`;
+        groupStatsTable.innerHTML = groupHeaderHtml + groupBodyHtml;
+
+        let dashboardHeaderHtml = `
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background-color: var(--surface-color); z-index: 1;">
+                    <th style="padding: 12px;">IP 주소</th>
+        `;
+        activeWorkers.forEach(w => {
+            dashboardHeaderHtml += `
+                <th style="padding: 12px; text-align: center; min-width: 140px; line-height: 1.3;">
+                    ${w.name}<br><span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal;">(성공횟수/실패횟수)</span>
+                </th>
+            `;
+        });
+        dashboardHeaderHtml += `
+                <th style="padding: 12px; text-align: right; min-width: 120px; color: var(--success-color);">성공</th>
+                <th style="padding: 12px; text-align: right; min-width: 120px; color: var(--danger-color);">실패</th>
+            </tr>
+        </thead>
+        `;
+
+        const serverEntries = Object.entries(serverStates);
+        const filteredEntries = serverEntries.filter(([rawLine, _]) => {
+            return activeGroupTab === 'All' || extractGroup(rawLine) === activeGroupTab;
+        });
+
+        if (filteredEntries.length === 0) {
+            const colSpan = 3 + activeWorkers.length;
+            dashboardTableBody.innerHTML = `<tr><td colspan="${colSpan}" style="padding: 30px; text-align: center; color: var(--text-secondary);">모니터링 대상이 없습니다.</td></tr>`;
+        } else {
+            filteredEntries.forEach(([rawLine, state]) => {
+                const cleanIp = extractIp(rawLine);
+                const groupName = extractGroup(rawLine);
+                
+                let rowHtml = `
+                    <td style="padding: 12px; font-family: monospace; font-weight: 600;">${cleanIp}</td>
+                `;
+
+                // 1. Render worker counts
+                activeWorkers.forEach(w => {
+                    const ws = state.workers[w.id] || { successCount: 0, failureCount: 0, alive: null, latency: null, method: '', error: null };
+                    rowHtml += `
+                        <td style="padding: 12px; text-align: center; font-weight: 600;">
+                            <span style="color: var(--success-color);">${ws.successCount || 0}</span> / 
+                            <span style="color: var(--danger-color);">${ws.failureCount || 0}</span>
+                        </td>
+                    `;
+                });
+
+                // 2. Aggregate latest Success and latest Failure at the end
+                let latestSuccess = null;
+                let latestFailure = null;
+
+                activeWorkers.forEach(w => {
+                    const ws = state.workers[w.id];
+                    if (ws) {
+                        if (ws.alive === true) {
+                            if (!latestSuccess || (ws.lastChecked && new Date(ws.lastChecked) > new Date(latestSuccess.lastChecked))) {
+                                latestSuccess = ws;
+                            }
+                        } else if (ws.alive === false) {
+                            if (!latestFailure || (ws.lastChecked && new Date(ws.lastChecked) > new Date(latestFailure.lastChecked))) {
+                                latestFailure = ws;
+                            }
+                        }
+                    }
+                });
+
+                // Render success result
+                if (latestSuccess) {
+                    let methodStr = '';
+                    if (latestSuccess.method === 'raw_socket') methodStr = ' [Raw]';
+                    else if (latestSuccess.method === 'system_ping') methodStr = ' [CLI]';
+                    else if (latestSuccess.method === 'tcp_port') methodStr = ' [TCP]';
+                    rowHtml += `
+                        <td style="padding: 12px; text-align: right; color: var(--success-color); font-weight: 600;">
+                            ${latestSuccess.latency}ms<span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal;">${methodStr}</span>
+                        </td>
+                    `;
+                } else {
+                    rowHtml += `<td style="padding: 12px; text-align: right; color: var(--text-secondary);">-</td>`;
+                }
+
+                // Render failure result
+                if (latestFailure) {
+                    let errDisplay = 'Timeout';
+                    if (latestFailure.error === 'refused') errDisplay = 'Refused';
+                    else if (latestFailure.error === 'unreachable') errDisplay = 'Unreachable';
+                    else if (latestFailure.error === 'error') errDisplay = 'Error';
+                    
+                    let methodStr = '';
+                    if (latestFailure.method === 'raw_socket') methodStr = ' [Raw]';
+                    else if (latestFailure.method === 'system_ping') methodStr = ' [CLI]';
+                    else if (latestFailure.method === 'tcp_port') methodStr = ' [TCP]';
+                    else if (latestFailure.method === 'error') methodStr = ' [Err]';
+                    rowHtml += `
+                        <td style="padding: 12px; text-align: right; color: var(--danger-color); font-weight: 700;">
+                            ${errDisplay}<span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal;">${methodStr}</span>
+                        </td>
+                    `;
+                } else {
+                    rowHtml += `<td style="padding: 12px; text-align: right; color: var(--text-secondary);">-</td>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.innerHTML = rowHtml;
+                dashboardTableBody.appendChild(tr);
+            });
         }
 
-        // Update counts
-        const total = Object.keys(serverStates).length;
-        totalCountEl.textContent = total;
-        successCountEl.textContent = successCount;
-        failedCountEl.textContent = failedCount;
-
-        paneSuccessCountEl.textContent = successCount;
-        paneFailedCountEl.textContent = failedCount;
+        const existingHead = monitoringDashboardTable.querySelector('thead');
+        if (existingHead) existingHead.remove();
+        monitoringDashboardTable.insertAdjacentHTML('afterbegin', dashboardHeaderHtml);
     }
+
+    // Render Group Filter Tabs dynamically
+    function renderTabs() {
+        const uniqueGroups = new Set();
+        Object.keys(serverStates).forEach(rawLine => {
+            uniqueGroups.add(extractGroup(rawLine));
+        });
+
+        const sortedGroups = Array.from(uniqueGroups).sort();
+        
+        if (sortedGroups.length <= 1) {
+            tabsContainer.style.display = 'none';
+            return;
+        }
+
+        tabsContainer.style.display = 'flex';
+        tabsContainer.innerHTML = '';
+
+        const allBtn = document.createElement('button');
+        allBtn.className = `tab-btn ${activeGroupTab === 'All' ? 'active' : ''}`;
+        allBtn.textContent = '전체 🌐';
+        allBtn.addEventListener('click', () => {
+            activeGroupTab = 'All';
+            updateActiveTabStyling();
+            renderDashboard();
+        });
+        tabsContainer.appendChild(allBtn);
+
+        sortedGroups.forEach(group => {
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${activeGroupTab === group ? 'active' : ''}`;
+            btn.textContent = group;
+            btn.addEventListener('click', () => {
+                activeGroupTab = group;
+                updateActiveTabStyling();
+                renderDashboard();
+            });
+            tabsContainer.appendChild(btn);
+        });
+    }
+
+    function updateActiveTabStyling() {
+        const buttons = tabsContainer.querySelectorAll('.tab-btn');
+        buttons.forEach(btn => {
+            const isAll = btn.textContent.startsWith('전체') && activeGroupTab === 'All';
+            const isGroup = btn.textContent === activeGroupTab;
+            if (isAll || isGroup) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
 </script>
 
 </body>

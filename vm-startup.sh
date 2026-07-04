@@ -20,8 +20,49 @@ import select
 import platform
 import subprocess
 import argparse
+import threading
+import re
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import random
 from flask import Flask, request, jsonify
+
+
+tunnel_url = None
+
+def start_tunnel_thread(port):
+    global tunnel_url
+    print("[*] Starting localtunnel via npx...")
+    try:
+        use_shell = os.name == 'nt'
+        cmd = ["npx", "localtunnel", "--port", str(port)]
+        
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=use_shell,
+            text=True,
+            bufsize=1
+        )
+        
+        # Read stdout line by line
+        for line in iter(proc.stdout.readline, ''):
+            stripped = line.strip()
+            if stripped:
+                print(f"[Tunnel] {stripped}")
+            match = re.search(r'your url is:\s*(https?://[^\s]+)', stripped)
+            if match:
+                tunnel_url = match.group(1)
+                print(f"\n=========================================")
+                print(f"🎉 터널 생성 완료: {tunnel_url}")
+                print(f"=========================================\n")
+                
+        proc.stdout.close()
+        proc.wait()
+    except Exception as e:
+        print(f"[!] 터널 기동 중 에러 발생: {e}")
+        print("[!] Node.js 및 npm이 설치되어 있는지 확인해 주세요.")
 
 app = Flask(__name__)
 
@@ -50,15 +91,15 @@ def calculate_checksum(source_string):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
-def ping_one_raw(ip, timeout=2.0):
+def ping_one_raw(ip, timeout=2.5):
     """
     Send an ICMP Echo Request using Python raw sockets and wait for Echo Reply.
-    Returns: (is_alive: bool, latency_ms: float or None)
+    Returns: (is_alive: bool, latency_ms: float or None, error_type: str or None)
     """
     try:
         dest_addr = socket.gethostbyname(ip)
     except socket.gaierror:
-        return False, None
+        return False, None, "unreachable"
 
     try:
         # Requires root/administrator privileges
@@ -68,36 +109,36 @@ def ping_one_raw(ip, timeout=2.0):
         # Propagate permission error to invoke fallback logic
         raise e
     except Exception:
-        return False, None
+        return False, None, "unreachable"
 
-    my_socket.settimeout(timeout)
-    
-    # Generate unique ID and Sequence Number
-    packet_id = (os.getpid() ^ int(time.time() * 1000)) & 0xFFFF
-    seq_num = 1
-    
-    # Pack header with checksum=0 first
-    # Format: !BBHHH (Type=8, Code=0, Checksum=0, ID, Seq)
-    header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0, 0, packet_id, seq_num)
-    data = struct.pack("d", time.time())
-    
-    # Calculate checksum and repack header
-    my_checksum = calculate_checksum(header + data)
-    header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0, my_checksum, packet_id, seq_num)
-    packet = header + data
-    
     try:
+        my_socket.settimeout(timeout)
+        
+        # Generate unique ID using random module to prevent collisions in concurrent execution
+        packet_id = random.randint(1, 65535)
+        seq_num = 1
+        
+        # Pack header with checksum=0 first
+        # Format: !BBHHH (Type=8, Code=0, Checksum=0, ID, Seq)
+        header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0, 0, packet_id, seq_num)
+        data = struct.pack("d", time.time())
+        
+        # Calculate checksum and repack header
+        my_checksum = calculate_checksum(header + data)
+        header = struct.pack("!BBHHH", ICMP_ECHO_REQUEST, 0, my_checksum, packet_id, seq_num)
+        packet = header + data
+        
         my_socket.sendto(packet, (dest_addr, 1))
         
         started_select = time.time()
         while True:
             how_long_in_select = time.time() - started_select
             if how_long_in_select >= timeout:
-                return False, None
+                return False, None, "timeout"
                 
             what_ready = select.select([my_socket], [], [], timeout - how_long_in_select)
             if what_ready[0] == []:
-                return False, None
+                return False, None, "timeout"
                 
             time_received = time.time()
             rec_packet, addr = my_socket.recvfrom(1024)
@@ -111,70 +152,134 @@ def ping_one_raw(ip, timeout=2.0):
             
             # Type 0 = Echo Reply
             if type == 0 and rec_id == packet_id and rec_seq == seq_num:
-                latency = (time_received - started_select) * 1000
-                return True, round(latency, 1)
+                if addr[0] == dest_addr:
+                    latency = (time_received - started_select) * 1000
+                    return True, round(latency, 1), None
+            # Type 3 = Destination Unreachable
+            elif type == 3:
+                try:
+                    orig_icmp = rec_packet[ip_header_len + 28 : ip_header_len + 36]
+                    orig_type, orig_code, orig_checksum, orig_id, orig_seq = struct.unpack("!BBHHH", orig_icmp)
+                    if orig_id == packet_id and orig_seq == seq_num:
+                        return False, None, "unreachable"
+                except Exception:
+                    pass
     except Exception:
-        return False, None
+        return False, None, "timeout"
     finally:
-        my_socket.close()
+        try:
+            my_socket.close()
+        except Exception:
+            pass
+
+
+# Limit concurrent ping executions across threads to protect system FD/process limits
+thread_sem = threading.BoundedSemaphore(100)
+executor = ThreadPoolExecutor(max_workers=100)
 
 def check_host_sync(ip, use_raw=True):
-    """
-    Checks if a host is alive using Raw Socket, System Ping, or TCP Connect sequentially.
-    Returns: (is_alive, latency, method)
-    """
-    # 1. Try Raw Socket ICMP
-    if use_raw:
-        try:
-            alive, latency = ping_one_raw(ip, timeout=2.0)
-            return alive, latency, "raw_socket"
-        except PermissionError:
-            # Fall through to permissionless methods
-            pass
-        except Exception:
-            return False, None, "raw_socket"
+    with thread_sem:
+        """
+        Checks if a host is alive using Raw Socket, System Ping, or TCP Connect sequentially.
+        Retries twice (total 2 attempts) to stay safe under proxy timeouts.
+        Returns: (is_alive, latency, method, error)
+        """
+        timeout = 1.5
+        retries = 1
 
-    # 2. First Fallback: System Ping CLI command
-    is_alive = False
-    latency = None
-    method = "system_ping"
-    
-    if platform.system().lower() == 'windows':
-        command = ['ping', '-n', '1', ip]
-    else:
-        command = ['ping', '-c', '1', '-n', '-W', '2', ip]
-        
-    try:
-        start_t = time.time()
-        res = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
-        end_t = time.time()
-        if res.returncode == 0:
-            is_alive = True
-            latency = round((end_t - start_t) * 1000, 1)
-    except Exception:
-        is_alive = False
-
-    # 3. Second Fallback: TCP Port checks (80 / 443)
-    if not is_alive:
-        method = "tcp_port"
-        for port in [80, 443]:
+        # 1. Try Raw Socket ICMP
+        if use_raw:
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(1.5)
-                    start_t = time.time()
-                    s.connect((ip, port))
-                    end_t = time.time()
+                last_err = "timeout"
+                for attempt in range(retries):
+                    alive, latency, err = ping_one_raw(ip, timeout=timeout)
+                    if alive:
+                        return True, latency, "raw_socket", None
+                    if err:
+                        last_err = err
+                    if attempt < retries - 1:
+                        time.sleep(0.1)
+                return False, None, "raw_socket", last_err
+            except PermissionError:
+                # Fall through to permissionless methods
+                pass
+            except Exception:
+                return False, None, "raw_socket", "timeout"
+
+        # 2. First Fallback: System Ping CLI command
+        is_alive = False
+        latency = None
+        method = "system_ping"
+        error_type = "timeout"
+    
+        timeout_ms = str(int(timeout * 1000))
+        timeout_sec = str(max(1, int(timeout + 0.5)))
+        if platform.system().lower() == 'windows':
+            command = ['ping', '-n', '1', '-w', timeout_ms, ip]
+        elif platform.system().lower() == 'darwin':
+            command = ['ping', '-c', '1', '-n', '-W', timeout_ms, ip]  # macOS uses ms
+        else:
+            command = ['ping', '-c', '1', '-n', '-W', timeout_sec, ip]  # Linux uses seconds
+        
+        for attempt in range(retries):
+            try:
+                start_t = time.time()
+                res = subprocess.run(command, capture_output=True, text=True, timeout=timeout + 1)
+                end_t = time.time()
+                if res.returncode == 0:
                     is_alive = True
                     latency = round((end_t - start_t) * 1000, 1)
+                    error_type = None
                     break
+                else:
+                    output = (res.stdout or "") + (res.stderr or "")
+                    if "unreachable" in output.lower() or "host down" in output.lower():
+                        error_type = "unreachable"
+                    else:
+                        error_type = "timeout"
+            except subprocess.TimeoutExpired:
+                error_type = "timeout"
             except Exception:
-                pass
+                error_type = "timeout"
+        
+            if attempt < retries - 1:
+                time.sleep(0.1)
 
-    return is_alive, latency, method
+        # 3. Second Fallback: TCP Port checks (80 / 443)
+        if not is_alive:
+            method = "tcp_port"
+            error_type = "timeout"
+            for port in [80, 443]:
+                for attempt in range(retries):
+                    try:
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.settimeout(1.0)
+                            start_t = time.time()
+                            s.connect((ip, port))
+                            end_t = time.time()
+                            is_alive = True
+                            latency = round((end_t - start_t) * 1000, 1)
+                            error_type = None
+                            break
+                    except ConnectionRefusedError:
+                        is_alive = False
+                        error_type = "refused"
+                    except (socket.timeout, TimeoutError):
+                        is_alive = False
+                        error_type = "timeout"
+                    except Exception as e:
+                        is_alive = False
+                        err_str = str(e).lower()
+                        if "unreachable" in err_str or "host down" in err_str:
+                            error_type = "unreachable"
+                        else:
+                            error_type = "timeout"
+                    if attempt < retries - 1:
+                        time.sleep(0.1)
+                if is_alive:
+                    break
 
-async def check_host_async(ip, use_raw=True):
-    """Run check_host_sync asynchronously in a worker thread."""
-    return await asyncio.to_thread(check_host_sync, ip, use_raw)
+        return is_alive, latency, method, error_type
 
 # Enable CORS manually to avoid external flask-cors dependency
 @app.after_request
@@ -182,10 +287,15 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'POST,GET,OPTIONS'
+    response.headers['Access-Control-Allow-Private-Network'] = 'true'
     return response
 
 @app.route('/ping', methods=['OPTIONS'])
 def options_ping():
+    return '', 204
+
+@app.route('/status', methods=['OPTIONS'])
+def options_status():
     return '', 204
 
 @app.route('/ping', methods=['POST'])
@@ -197,22 +307,18 @@ def run_ping():
     server_ips = data.get('server_ips', [])
     use_raw = data.get('use_raw', True)
     
-    # Process the batch concurrently via asyncio loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        tasks = [check_host_async(ip, use_raw) for ip in server_ips]
-        results_raw = loop.run_until_complete(asyncio.gather(*tasks))
-    finally:
-        loop.close()
+    # Process the batch concurrently using ThreadPoolExecutor submit
+    futures = [executor.submit(check_host_sync, ip, use_raw) for ip in server_ips]
+    results_raw = [f.result() for f in futures]
 
     results = []
-    for ip, (alive, latency, method) in zip(server_ips, results_raw):
+    for ip, (alive, latency, method, error) in zip(server_ips, results_raw):
         results.append({
             'ip': ip,
             'alive': alive,
             'latency': latency,
-            'method': method
+            'method': method,
+            'error': error
         })
 
     return jsonify({'results': results})
@@ -234,12 +340,25 @@ def get_status():
     return jsonify({
         'status': 'online',
         'platform': platform.system(),
-        'has_raw_privilege': has_raw_privilege
+        'has_raw_privilege': has_raw_privilege,
+        'tunnel_url': tunnel_url
     })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    parser = argparse.ArgumentParser(description="APP.ping Python Worker Service")
+    parser.add_argument('--port', type=int, default=5000, help="Port to run the service on (default: 5000)")
+    parser.add_argument('--host', type=str, default='0.0.0.0', help="Binding address (default: 0.0.0.0)")
+    parser.add_argument('--tunnel', action='store_true', help="Start npx localtunnel automatically")
+    args = parser.parse_args()
+
+    if args.tunnel:
+        t = threading.Thread(target=start_tunnel_thread, args=(args.port,), daemon=True)
+        t.start()
+
+    print(f"Starting APP.ping Worker on http://{args.host}:{args.port}")
+    port = int(os.environ.get('PORT', args.port))
+    app.run(host=args.host, port=port)
+
 EOF
 
 cat << 'EOF' > requirements.txt
