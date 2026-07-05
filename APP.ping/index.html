@@ -759,6 +759,14 @@
         });
     }
 
+    // Helper to get auth token asynchronously from parent window
+    async function getAuthToken() {
+        if (window.parent && window.parent.getAuthToken) {
+            return await window.parent.getAuthToken() || '';
+        }
+        return (window.parent && window.parent.authToken) ? window.parent.authToken : '';
+    }
+
     // Expose helpers globally so HTML onclick handlers can find them
     window.testWorkerConnection = testWorkerConnection;
     window.deleteWorker = deleteWorker;
@@ -772,7 +780,7 @@
         worker.status = 'testing';
         renderWorkers();
 
-        const parentAuthToken = window.parent.authToken || '';
+        const parentAuthToken = await getAuthToken();
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
@@ -875,8 +883,8 @@
 
     });
 
-    function loadDefaultWorker() {
-        const parentAuthToken = window.parent.authToken || '';
+    async function loadDefaultWorker() {
+        const parentAuthToken = await getAuthToken();
         fetch('../api/worker-config', {
             headers: {
                 'Authorization': `Bearer ${parentAuthToken}`
@@ -1173,7 +1181,7 @@
             });
 
             const ipBatch = Object.keys(ipToRawMap);
-            const parentAuthToken = window.parent.authToken || '';
+            const parentAuthToken = await getAuthToken();
 
             try {
                 const res = await fetch('../api/worker-ping-proxy', {
