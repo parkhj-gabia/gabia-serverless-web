@@ -801,6 +801,14 @@
                 saveWorkers();
                 renderWorkers();
                 return true;
+            } else {
+                res.json().then(errData => {
+                    console.error(`[worker-status-proxy failed] Status: ${res.status}, Error:`, errData);
+                }).catch(() => {
+                    res.text().then(errText => {
+                        console.error(`[worker-status-proxy failed] Status: ${res.status}, Body:`, errText);
+                    });
+                });
             }
         } catch (e) {
             console.error(`Status check failed for ${worker.name}:`, e);
@@ -1214,6 +1222,13 @@
                     });
                     return mappedResults;
                 } else {
+                    res.json().then(errData => {
+                        console.error(`[worker-ping-proxy failed] Status: ${res.status}, Error:`, errData);
+                    }).catch(() => {
+                        res.text().then(errText => {
+                            console.error(`[worker-ping-proxy failed] Status: ${res.status}, Body:`, errText);
+                        });
+                    });
                     return batch.map(rawLine => ({
                         rawLine: rawLine,
                         alive: false,
