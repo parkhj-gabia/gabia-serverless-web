@@ -250,6 +250,50 @@
             background: rgba(255, 255, 255, 0.1);
             margin: 12px 0;
         }
+
+        /* Tab Navigation Styles */
+        .tab-navigation {
+            display: flex;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -260,69 +304,105 @@
             <p>조건에 맞는 ID와 패스워드를 자동 생성합니다.</p>
         </div>
 
-        <div class="form-group">
-            <label for="genUserId">고객 ID <span class="required">*</span> <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.85rem;">(5글자 이상)</span></label>
-            <input type="text" id="genUserId" placeholder="고객 ID를 입력하세요">
-        </div>
-        
-        <div class="form-group">
-            <label for="genIpAddr">서버 IP 주소 <span class="required">*</span></label>
-            <input type="text" id="genIpAddr" placeholder="예: 192.168.10.55">
+        <!-- 탭 네비게이션 -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" data-tab="managed">매니지드패턴생성</button>
+            <button class="tab-btn" data-tab="admin">관리서버패턴생성</button>
         </div>
 
-        <div class="options-panel">
-            <div class="radio-group">
-                <label class="group-label">비밀번호 접두어 <span style="color: var(--text-secondary); font-size: 0.85rem; font-weight: normal; margin-left: 4px;">(Gen1 은 달러로 시작함)</span></label>
-                <div class="radio-options">
-                    <label class="radio-option"><input type="radio" name="genPrefix" value="dirn" checked> 야구 (dirn)</label>
-                    <label class="radio-option"><input type="radio" name="genPrefix" value="ekffj"> 달러 (ekffj)</label>
+        <!-- 매니지드 패턴 생성 탭 -->
+        <div id="managedTab" class="tab-content active">
+            <div class="form-group">
+                <label for="genUserId">고객 ID <span class="required">*</span> <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.85rem;">(5글자 이상)</span></label>
+                <input type="text" id="genUserId" placeholder="고객 ID를 입력하세요">
+            </div>
+            
+            <div class="form-group">
+                <label for="genIpAddr">서버 IP 주소 <span class="required">*</span></label>
+                <input type="text" id="genIpAddr" placeholder="예: 192.168.10.55">
+            </div>
+
+            <div class="options-panel">
+                <div class="radio-group">
+                    <label class="group-label">비밀번호 접두어 <span style="color: var(--text-secondary); font-size: 0.85rem; font-weight: normal; margin-left: 4px;">(Gen1 은 달러로 시작함)</span></label>
+                    <div class="radio-options">
+                        <label class="radio-option"><input type="radio" name="genPrefix" value="dirn" checked> 야구 (dirn)</label>
+                        <label class="radio-option"><input type="radio" name="genPrefix" value="ekffj"> 달러 (ekffj)</label>
+                    </div>
+                </div>
+
+                <div class="radio-group">
+                    <label class="group-label">인프라 환경</label>
+                    <div class="radio-options">
+                        <label class="radio-option"><input type="radio" name="genEnv" value="tjqj"> 클라우드 (tjqj)</label>
+                        <label class="radio-option"><input type="radio" name="genEnv" value="anffl" checked> 물리 (anffl)</label>
+                    </div>
+                </div>
+
+                <div class="radio-group">
+                    <label class="group-label">운영체제(OS)</label>
+                    <div class="radio-options">
+                        <label class="radio-option"><input type="radio" name="genOs" value="fl" checked> 리눅스 (fl)</label>
+                        <label class="radio-option"><input type="radio" name="genOs" value="dnls"> 윈도우 (dnls)</label>
+                    </div>
                 </div>
             </div>
 
-            <div class="radio-group">
-                <label class="group-label">인프라 환경</label>
-                <div class="radio-options">
-                    <label class="radio-option"><input type="radio" name="genEnv" value="tjqj"> 클라우드 (tjqj)</label>
-                    <label class="radio-option"><input type="radio" name="genEnv" value="anffl" checked> 물리 (anffl)</label>
-                </div>
-            </div>
+            <button class="btn" id="generateBtn">ID / 패스워드 생성하기</button>
 
-            <div class="radio-group">
-                <label class="group-label">운영체제(OS)</label>
-                <div class="radio-options">
-                    <label class="radio-option"><input type="radio" name="genOs" value="fl" checked> 리눅스 (fl)</label>
-                    <label class="radio-option"><input type="radio" name="genOs" value="dnls"> 윈도우 (dnls)</label>
+            <div id="genError" class="error-message"></div>
+
+            <div id="genResult" class="result-panel">
+                <div class="result-row">
+                    <span class="result-label" style="width: 45px;">SSH:</span>
+                    <button class="copy-btn" id="copySshBtn" title="클릭하여 복사">
+                        <span id="resSsh" class="result-value"></span>
+                        <span class="copy-icon">📋</span>
+                    </button>
+                </div>
+                <div class="divider"></div>
+                <div class="result-row">
+                    <span class="result-label" style="width: 45px;">ID:</span>
+                    <button class="copy-btn" id="copyIdBtn" title="클릭하여 복사">
+                        <span id="resId" class="result-value"></span>
+                        <span class="copy-icon">📋</span>
+                    </button>
+                </div>
+                <div class="divider"></div>
+                <div class="result-row">
+                    <span class="result-label" style="width: 45px;">PW:</span>
+                    <button class="copy-btn" id="copyPwBtn" title="클릭하여 복사">
+                        <span id="resPw" class="result-value"></span>
+                        <span class="copy-icon">📋</span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <button class="btn" id="generateBtn">ID / 패스워드 생성하기</button>
-
-        <div id="genError" class="error-message"></div>
-
-        <div id="genResult" class="result-panel">
-            <div class="result-row">
-                <span class="result-label" style="width: 45px;">SSH:</span>
-                <button class="copy-btn" id="copySshBtn" title="클릭하여 복사">
-                    <span id="resSsh" class="result-value"></span>
-                    <span class="copy-icon">📋</span>
-                </button>
+        <!-- 관리서버 패턴 생성 탭 -->
+        <div id="adminTab" class="tab-content">
+            <div class="form-group">
+                <label for="adminHostName">호스트명 <span class="required">*</span> <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.85rem;">(3글자 이상)</span></label>
+                <input type="text" id="adminHostName" placeholder="호스트명을 입력하세요 (예: web01)">
             </div>
-            <div class="divider"></div>
-            <div class="result-row">
-                <span class="result-label" style="width: 45px;">ID:</span>
-                <button class="copy-btn" id="copyIdBtn" title="클릭하여 복사">
-                    <span id="resId" class="result-value"></span>
-                    <span class="copy-icon">📋</span>
-                </button>
+            
+            <div class="form-group">
+                <label for="adminIpAddr">호스트 IP 주소 <span class="required">*</span></label>
+                <input type="text" id="adminIpAddr" placeholder="예: 192.168.10.55">
             </div>
-            <div class="divider"></div>
-            <div class="result-row">
-                <span class="result-label" style="width: 45px;">PW:</span>
-                <button class="copy-btn" id="copyPwBtn" title="클릭하여 복사">
-                    <span id="resPw" class="result-value"></span>
-                    <span class="copy-icon">📋</span>
-                </button>
+
+            <button class="btn" id="adminGenerateBtn">패스워드 생성하기</button>
+
+            <div id="adminError" class="error-message"></div>
+
+            <div id="adminResult" class="result-panel">
+                <div class="result-row">
+                    <span class="result-label" style="width: 45px;">PW:</span>
+                    <button class="copy-btn" id="copyAdminPwBtn" title="클릭하여 복사">
+                        <span id="resAdminPw" class="result-value"></span>
+                        <span class="copy-icon">📋</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -397,6 +477,77 @@
         setupCopy('copySshBtn', 'resSsh');
         setupCopy('copyIdBtn', 'resId');
         setupCopy('copyPwBtn', 'resPw');
+
+        // 탭 전환 로직
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+                
+                // 탭 버튼 active 클래스 전환
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // 탭 콘텐츠 active 클래스 전환
+                tabContents.forEach(content => {
+                    if (content.id === targetTab + 'Tab') {
+                        content.classList.add('active');
+                    } else {
+                        content.classList.remove('active');
+                    }
+                });
+
+                // 탭 전환 시 기존의 에러 및 결과창 초기화
+                document.getElementById('genError').style.display = 'none';
+                document.getElementById('genResult').style.display = 'none';
+                document.getElementById('adminError').style.display = 'none';
+                document.getElementById('adminResult').style.display = 'none';
+            });
+        });
+
+        // 관리서버패턴 생성 로직
+        document.getElementById('adminGenerateBtn').addEventListener('click', () => {
+            const hostName = document.getElementById('adminHostName').value.trim();
+            const ipAddr = document.getElementById('adminIpAddr').value.trim();
+            
+            const errorBox = document.getElementById('adminError');
+            const resultBox = document.getElementById('adminResult');
+            
+            errorBox.style.display = 'none';
+            resultBox.style.display = 'none';
+
+            if (hostName.length < 3) {
+                errorBox.innerText = "호스트명은 3글자 이상 입력해주세요.";
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            if (!ipAddr) {
+                errorBox.innerText = "호스트 IP 주소를 입력해주세요.";
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            // IP 주소 4번째 옥텟 추출 검증
+            const ipParts = ipAddr.split('.');
+            if (ipParts.length !== 4 || ipParts.some(part => isNaN(parseInt(part)) || part === '')) {
+                errorBox.innerText = "올바른 IP 주소(예: 192.168.10.55) 형식이 아닙니다.";
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            const ip4thOctet = ipParts[3];
+            const hostThreeChars = hostName.substring(0, 3);
+            const generatedPw = "wjrak##" + ip4thOctet + hostThreeChars;
+
+            document.getElementById('resAdminPw').innerText = generatedPw;
+            resultBox.style.display = 'block';
+        });
+
+        // 관리서버 탭 복사 버튼 바인딩
+        setupCopy('copyAdminPwBtn', 'resAdminPw');
     </script>
 </body>
 </html>
